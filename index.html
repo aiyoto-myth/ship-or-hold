@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ship or Hold: weather check for live plant and animal orders</title>
+<meta name="description" content="Paste your orders and see, for each one, the forecast where you ship from, at the carrier hub and at your buyer's door. Ship it, add a heat pack, or hold it, with a note to send the buyer.">
+<link rel="canonical" href="https://samsbench.com/ship-or-hold/">
+<meta property="og:title" content="Ship or Hold">
+<meta property="og:description" content="Every order's route, checked against the forecast: your town, the carrier hub, your buyer's door. Ship, heat pack, or hold.">
+<meta property="og:url" content="https://samsbench.com/ship-or-hold/">
+<meta property="og:image" content="https://samsbench.com/ship-or-hold/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --kraft:#e4d3b3; --kraft2:#d6c19b; --ink:#1c1a17; --ink2:#3b362f; --paper:#fffdf8; --line:#1c1a17;
+  --hold:#b8261b; --ins:#9a3f0c; --pack:#a94a0a; --cold:#1d5ea8; --station:#5b3c99; --ok:#21703a; --unk:#3b362f;
+  --hold-bg:#fbe4e0; --ins-bg:#fbe6d6; --pack-bg:#fdeedd; --cold-bg:#e1ecf9; --station-bg:#ece5f7; --ok-bg:#e2f1e5; --unk-bg:#ece8e0;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --sans:"Archivo", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--kraft);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45;
+  background-image:repeating-linear-gradient(115deg, rgba(120,90,40,.05) 0 2px, transparent 2px 7px), repeating-linear-gradient(25deg, rgba(255,255,255,.07) 0 1px, transparent 1px 9px);}
+a{color:var(--ink)}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 16px 60px}
+
+/* masthead: a shipping label */
+.mast{background:var(--paper);border:3px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:0;margin-bottom:18px}
+.mast .id{padding:18px 20px 16px;border-right:3px solid var(--line)}
+.mast h1{margin:0;font-weight:900;font-stretch:125%;font-size:clamp(34px,6vw,64px);line-height:.92;letter-spacing:-.01em;text-transform:uppercase}
+.mast h1 .or{font-stretch:62%;font-weight:600;font-size:.62em;vertical-align:.12em;padding:0 .08em}
+.mast p.lede{margin:12px 0 0;font-size:clamp(16px,1.9vw,19px);max-width:62ch}
+.mast .codes{display:flex;flex-direction:column;justify-content:space-between;min-width:190px}
+.mast .codes div{padding:10px 14px;border-bottom:3px solid var(--line);font-family:var(--mono);font-size:13px}
+.mast .codes div:last-child{border-bottom:0}
+.mast .codes b{display:block;font-family:var(--sans);font-stretch:125%;font-weight:900;font-size:22px;line-height:1.05}
+.mast .codes .k-hold b{color:var(--hold)} .mast .codes .k-pack b{color:var(--pack)} .mast .codes .k-ok b{color:var(--ok)}
+@media (max-width:700px){.mast{grid-template-columns:1fr}.mast .id{border-right:0;border-bottom:3px solid var(--line)}.mast .codes{flex-direction:row;min-width:0}.mast .codes div{flex:1;border-bottom:0;border-right:3px solid var(--line);font-size:11px;padding:8px}.mast .codes div:last-child{border-right:0}.mast .codes b{font-size:16px}}
+
+.grid{display:grid;grid-template-columns:370px 1fr;gap:18px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--paper);border:2px solid var(--line)}
+.panel>h2{margin:0;padding:10px 14px;border-bottom:2px solid var(--line);font-size:15px;font-weight:800;font-stretch:115%;text-transform:uppercase;letter-spacing:.04em;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.panel>h2 small{font-family:var(--mono);font-weight:500;font-size:12px;text-transform:none;letter-spacing:0}
+.pbody{padding:14px}
+.set{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+@media (max-width:960px){.set{position:static}}
+label.f{display:block;font-weight:700;font-size:14px;margin:0 0 5px}
+.fld{margin-bottom:14px}
+.fld:last-child{margin-bottom:0}
+input[type=text],select,textarea{width:100%;border:2px solid var(--line);background:#fff;border-radius:0;padding:8px 10px;font-size:16px}
+input[type=text]:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint{font-size:13.5px;margin:5px 0 0;color:var(--ink2)}
+.zipname{font-family:var(--mono);font-size:13px;margin-top:4px;min-height:1.2em}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:2px solid var(--line);background:#fff;padding:5px 8px;cursor:pointer;font-size:13.5px;font-weight:700;line-height:1.15;text-align:left}
+.chip small{display:block;font-family:var(--mono);font-weight:500;font-size:11.5px}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.chip.off{border-style:dashed}
+.chip:disabled{cursor:not-allowed;border-style:dashed;background:transparent}
+.hubrow{display:flex;gap:6px;margin-bottom:6px}
+.hubrow input{flex:1}
+.hubrow button{flex:0 0 auto}
+.btn{border:2px solid var(--line);background:#fff;padding:9px 14px;font-weight:800;cursor:pointer;font-size:15px;border-radius:0}
+.btn:hover{background:var(--kraft)}
+.btn.primary{background:var(--ink);color:var(--paper)}
+.btn.primary:hover{background:#3a352d}
+.btn.small{padding:5px 9px;font-size:13.5px}
+.btn:disabled{opacity:.55;cursor:wait}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:14.5px}
+.check input{margin-top:3px;width:18px;height:18px;accent-color:var(--ink)}
+
+/* the scale: one bar per goods type */
+.scale{margin-top:8px;border:2px solid var(--line);font-family:var(--mono);font-size:11.5px}
+.scale .bar{display:flex;height:30px}
+.scale .bar span{display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);font-weight:600;overflow:hidden;white-space:nowrap;padding:0 2px}
+.scale .bar span:last-child{border-right:0}
+.scale .ticks{position:relative;height:16px;border-top:1px solid var(--line);background:#fff}
+.scale .ticks i{position:absolute;top:1px;transform:translateX(-50%);font-style:normal}
+.scale .src{padding:5px 7px;border-top:1px solid var(--line);background:#fff;font-family:var(--sans);font-size:12.5px}
+.b-hold{background:var(--hold);color:#fff}.b-ins{background:var(--ins);color:#fff}.b-pack{background:#f0a35e;color:var(--ink)}.b-ok{background:#9fcfa9;color:var(--ink)}.b-cold{background:#8db7e6;color:var(--ink)}.b-station{background:#b7a2de;color:var(--ink)}
+details.th{margin-top:8px}
+details.th summary{cursor:pointer;font-weight:700;font-size:14px}
+.thgrid{display:grid;grid-template-columns:1fr 78px;gap:6px 8px;align-items:center;margin-top:8px;font-size:13.5px}
+.thgrid input{padding:5px 7px;font-size:15px;font-family:var(--mono)}
+
+/* orders */
+textarea{min-height:150px;font-family:var(--mono);font-size:14px;line-height:1.5;resize:vertical}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+.status{font-family:var(--mono);font-size:13px;margin-top:8px;min-height:1.3em}
+.status.err{color:var(--hold);font-weight:600}
+.parsed{font-size:13.5px;margin-top:6px}
+
+/* results */
+.sumbar{display:flex;flex-wrap:wrap;gap:0;border:2px solid var(--line);background:var(--paper);margin-bottom:12px}
+.sumbar div{flex:1 1 0;min-width:0;padding:9px 12px;border-right:2px solid var(--line);font-size:13px}
+.sumbar div:last-child{border-right:0}
+.sumbar b{display:block;font-size:26px;font-weight:900;font-stretch:120%;line-height:1}
+.sumbar .s-hold b{color:var(--hold)}.sumbar .s-pack b{color:var(--pack)}.sumbar .s-ok b{color:var(--ok)}.sumbar .s-other b{color:var(--cold)}
+.when{font-size:14.5px;margin:0 0 12px;padding:10px 12px;background:var(--paper);border:2px solid var(--line)}
+.label{background:var(--paper);border:2px solid var(--line);margin-bottom:12px;display:grid;grid-template-columns:minmax(150px,210px) 1fr 160px;position:relative}
+.label .who{padding:12px;border-right:2px dashed var(--line)}
+.label .who .nm{font-weight:800;font-size:16px;word-break:break-word}
+.label .who .zp{font-family:var(--mono);font-size:13px;margin-top:2px}
+.label .route{padding:12px;display:flex;align-items:stretch;gap:0;min-width:0}
+.stop{flex:1 1 0;min-width:0;padding:0 8px;border-left:3px solid var(--ink2);position:relative}
+.stop:first-child{border-left-color:var(--ink2)}
+.stop .wh{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stop .t{font-family:var(--mono);font-size:13px;line-height:1.35}
+.stop .t b{font-size:15px}
+.stop .t .worst{background:var(--ink);color:var(--paper);padding:0 3px}
+.stop .t .na{font-style:italic}
+.label .verdict{padding:10px;border-left:2px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center}
+.stamp{display:inline-block;border:3px double currentColor;padding:4px 8px;font-weight:900;font-stretch:115%;text-transform:uppercase;letter-spacing:.03em;transform:rotate(-4deg);font-size:18px;line-height:1.05;background:var(--paper)}
+.v-hold .stamp{color:var(--hold)}.v-insulate .stamp{color:var(--ins)}.v-pack .stamp{color:var(--pack)}.v-coldpack .stamp{color:var(--cold)}.v-station .stamp{color:var(--station)}.v-ok .stamp{color:var(--ok)}.v-mixed .stamp,.v-unknown .stamp,.v-skip .stamp{color:var(--unk)}
+.v-hold{background:var(--hold-bg)}.v-insulate{background:var(--ins-bg)}.v-pack{background:var(--pack-bg)}.v-coldpack{background:var(--cold-bg)}.v-station{background:var(--station-bg)}.v-mixed,.v-unknown,.v-skip{background:var(--unk-bg)}
+.label .verdict .why{font-size:12.5px;line-height:1.3}
+.label .foot{grid-column:1/-1;border-top:2px solid var(--line);padding:8px 12px;font-size:14px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:#fff}
+.label .foot .next{font-weight:700}
+#results{container-type:inline-size}
+@container (max-width:720px){
+  .label{grid-template-columns:1fr auto}
+  .label .who{border-right:0;border-bottom:2px dashed var(--line)}
+  .label .verdict{grid-column:2;grid-row:1;border-left:2px dashed var(--line);border-bottom:2px dashed var(--line)}
+  .label .route{grid-column:1/-1;flex-direction:column;gap:8px}
+  .stop{border-left-width:3px}
+}
+.empty{background:var(--paper);border:2px dashed var(--line);padding:22px;font-size:15.5px}
+.empty ol{margin:8px 0 0;padding-left:20px}
+.more{background:var(--paper);border:2px solid var(--line);padding:12px 14px;margin-bottom:12px;font-size:15px}
+
+/* pro */
+.pro{margin-top:18px;background:var(--ink);color:var(--paper);border:2px solid var(--line);padding:18px}
+.pro h2{margin:0 0 6px;font-stretch:120%;font-weight:900;font-size:24px;text-transform:uppercase}
+.pro ul{margin:8px 0 12px;padding-left:20px}
+.pro li{margin:3px 0}
+.pro .price{font-family:var(--mono);font-size:15px}
+.pro .btn{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.pro .btn.buy{background:#f0a35e;border-color:#f0a35e;font-size:17px;padding:11px 18px;text-decoration:none;display:inline-block}
+.pro input[type=text]{border-color:var(--paper)}
+.pro label.f{color:var(--paper)}
+.pro .on{font-size:17px;font-weight:700}
+.prorow{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}
+.prorow>div{flex:1 1 240px}
+.actnote{min-height:1.3em;margin:6px 0 0;font-size:14px}
+
+footer{margin-top:26px;font-size:13.5px;max-width:80ch}
+footer p{margin:6px 0}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;font-weight:700;display:none;z-index:9;border:2px solid var(--paper)}
+.sr{position:absolute;left:-9999px}
+
+/* print: the pack list only */
+#printSheet{display:none}
+@media print{
+  body{background:#fff}
+  .wrap>*:not(#printSheet){display:none!important}
+  #printSheet{display:block;font-family:var(--sans);color:#000}
+  #printSheet h2{font-size:20px;margin:0 0 4px}
+  #printSheet table{width:100%;border-collapse:collapse;font-size:12px}
+  #printSheet th,#printSheet td{border:1px solid #000;padding:4px 6px;text-align:left;vertical-align:top}
+  #printSheet .mk{font-weight:800;text-transform:uppercase}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <div class="id">
+    <h1>Ship <span class="or">or</span> Hold</h1>
+    <p class="lede">Paste this week's orders. For each one you get the forecast where you ship from, at the carrier hub and at your buyer's door, and a call: ship it, add a heat pack, or hold it. Made for people who mail live plants and animals.</p>
+  </div>
+  <div class="codes" aria-hidden="true">
+    <div class="k-ok"><b>SHIP</b>route is in your safe range</div>
+    <div class="k-pack"><b>HEAT PACK</b>cold somewhere on the way</div>
+    <div class="k-hold"><b>HOLD</b>too cold or hot, even packed</div>
+  </div>
+</header>
+
+<div class="grid">
+<aside class="panel set" aria-label="Route settings">
+  <h2>Your route <small id="setNote"></small></h2>
+  <div class="pbody">
+    <div class="fld">
+      <label class="f" for="origin">You ship from (ZIP)</label>
+      <input type="text" id="origin" inputmode="numeric" maxlength="10" autocomplete="postal-code" placeholder="e.g. 33602">
+      <div class="zipname" id="originName"></div>
+    </div>
+    <div class="fld row2">
+      <div><label class="f" for="carrier">Carrier</label>
+        <select id="carrier"><option value="fedex">FedEx</option><option value="ups">UPS</option><option value="usps">USPS</option></select></div>
+      <div><label class="f" for="service">Service</label>
+        <select id="service"><option value="1">Overnight (1 day)</option><option value="2">2-day</option><option value="3">3-day / Priority</option></select></div>
+    </div>
+    <div class="fld">
+      <label class="f" id="hubLbl">Carrier hub it passes through</label>
+      <div id="hubs" role="group" aria-labelledby="hubLbl"></div>
+      <div class="chips" id="hubPresets" aria-label="Common hubs"></div>
+      <p class="hint" id="hubHint"></p>
+    </div>
+    <div class="fld">
+      <label class="f" for="preset">What you ship</label>
+      <select id="preset"></select>
+      <div class="scale" id="scale"></div>
+      <details class="th" id="thBox"><summary>Change the temperatures</summary><div class="thgrid" id="thGrid"></div></details>
+    </div>
+    <div class="fld">
+      <label class="f" id="shipLbl">Ship day</label>
+      <div class="chips" id="days" role="group" aria-labelledby="shipLbl"></div>
+      <p class="hint" id="dayHint"></p>
+    </div>
+    <div class="fld">
+      <label class="check"><input type="checkbox" id="buffer"> <span>Also check the day after delivery (box arrives late or sits on the porch)</span></label>
+    </div>
+    <div class="fld">
+      <label class="check"><input type="checkbox" id="dropDay"> <span>My boxes are with the carrier by the afternoon: don't check my own town overnight</span></label>
+    </div>
+    <div class="fld">
+      <label class="f" id="wdLbl">Days you ship</label>
+      <div class="chips" id="wdays" role="group" aria-labelledby="wdLbl"></div>
+      <p class="hint">Used to find the next safe day for held orders.</p>
+    </div>
+  </div>
+</aside>
+
+<main>
+  <section class="panel" aria-label="Orders">
+    <h2>Orders <small id="orderCount"></small></h2>
+    <div class="pbody">
+      <label class="f" for="orders">Paste an order export (Etsy, Shopify, any CSV with a ZIP column) or one order per line: name and ZIP</label>
+      <textarea id="orders" spellcheck="false" placeholder="#1042 Dana Ruiz, 55401&#10;#1043 Marcus Lee 80202&#10;Priya N. 02108"></textarea>
+      <div class="parsed" id="parsed"></div>
+      <div class="acts">
+        <button class="btn primary" type="button" id="btnCheck">Check orders</button>
+        <button class="btn" type="button" id="btnExample">Try an example</button>
+        <button class="btn small" type="button" id="btnClear">Clear</button>
+      </div>
+      <div class="status" id="status" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="results" style="margin-top:18px"></section>
+
+  <section class="pro" id="proSec" aria-label="Ship or Hold Pro"></section>
+
+  <footer>
+    <p>Forecasts come from the US National Weather Service (api.weather.gov), fetched when you press Check. Forecasts change: check again the morning you pack. US addresses only. ZIP locations: <a href="https://www.geonames.org/">GeoNames</a> (CC BY 4.0) and US Census ZIP-area centers.</p>
+    <p>The temperature bands are the published guidelines named under the scale (USARK, Reptiles Express, Palmstreet, Predatory Plants). Set your own if you know your stock better. This page makes the call from the numbers; the decision to ship is yours. Your orders and settings stay on this device; only ZIP-area coordinates go to the weather service, and only the email you type to unlock Pro is sent, to check the purchase.</p>
+    <p>Made by Sam at <a href="https://samsbench.com/?via=sh-footer">Sam's Bench</a>.</p>
+  </footer>
+
+  <div id="printSheet"></div>
+</main>
+</div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function lsGet(k, d){ try{ var t = localStorage.getItem(k); return t ? JSON.parse(t) : d; }catch(e){ return d; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+
+/* ---------- guidelines (each band boundary goes to the more protective side) ----------
+   holdLo: low at or below -> hold.  insLo: at or below -> heat pack + insulated box.  packLo: at or below -> heat pack.
+   coldHi: high at or above -> cold pack.  stationHi: at or above -> ship to a carrier location for pickup.  holdHi: at or above -> hold. */
+var PRESETS = {
+  plants:   {label:'Tropical plants & houseplants', goods:'plants', holdLo:31, insLo:40, packLo:50, coldHi:86, stationHi:null, holdHi:95,
+             src:'Cold side: Palmstreet cold-weather guide (above 50°F no pack; 40–50°F heat pack; 32–40°F heat pack with insulation; below 32°F hold). Hot side is our default, not a published rule: cold pack from 86°F, hold from 95°F. Change it if you know better.'},
+  hardy:    {label:'Hardy or dormant plants', goods:'plants', holdLo:15, insLo:32, packLo:null, coldHi:86, stationHi:null, holdHi:95,
+             src:'Cold side: Predatory Plants winter shipping (ships as-is above freezing; heat pack in an insulated box at or below freezing; holds in the low teens and below, read here as 15°F). Hot side is our default, not a published rule: cold pack from 86°F, hold from 95°F.'},
+  reptiles: {label:'Reptiles (USARK)', goods:'animals', holdLo:37, insLo:null, packLo:69, coldHi:null, stationHi:92, holdHi:96,
+             src:'USARK shipping guidelines, reptiles: below 38°F don\'t ship; 38–69°F heat pack (40 hours or more); 70–91°F nothing; 92–100°F ship to a FedEx location; over 95°F don\'t ship.'},
+  reptilesx:{label:'Reptiles (Reptiles Express)', goods:'animals', holdLo:40, insLo:null, packLo:70, coldHi:85, stationHi:null, holdHi:95,
+             src:'Reptiles Express packing guidelines: 40°F or less don\'t ship; 40–70°F heat pack (40 hours or more); 70–85°F nothing; 85–95°F cold pack; 95°F and up don\'t ship.'},
+  amphib:   {label:'Amphibians (USARK)', goods:'animals', holdLo:37, insLo:null, packLo:59, coldHi:80, stationHi:92, holdHi:96,
+             src:'USARK, amphibians: below 38°F don\'t ship; 38–59°F heat pack; 60–79°F nothing; 80–92°F cold pack; 92–100°F FedEx location; over 95°F don\'t ship.'},
+  inverts:  {label:'Tarantulas & invertebrates (USARK)', goods:'animals', holdLo:37, insLo:null, packLo:65, coldHi:null, stationHi:92, holdHi:101,
+             src:'USARK, terrestrial and arboreal invertebrates: below 38°F don\'t ship; 38–65°F heat pack; 66–91°F nothing; 92–100°F FedEx location; over 100°F don\'t ship.'},
+  fish:     {label:'Tropical fish & coral (USARK)', goods:'fish', holdLo:39, insLo:null, packLo:69, coldHi:80, stationHi:90, holdHi:96,
+             src:'USARK, tropical fish and corals: below 40°F don\'t ship; 40–69°F heat pack; 70–79°F nothing; 80–89°F cold pack; 90–95°F FedEx location; over 95°F don\'t ship.'},
+  coldwater:{label:'Axolotls & cold-water fish (USARK)', goods:'animals', holdLo:29, insLo:null, packLo:49, coldHi:70, stationHi:80, holdHi:86,
+             src:'USARK, axolotls and cold-water fish: below 30°F don\'t ship; 30–49°F heat pack; 50–69°F nothing; 70–79°F cold pack; 80–85°F FedEx location; over 85°F don\'t ship.'},
+  custom:   {label:'My own temperatures', goods:'order', holdLo:32, insLo:null, packLo:45, coldHi:85, stationHi:null, holdHi:95, src:'Your own numbers.'}
+};
+var TH_KEYS = [['holdLo','Hold if the low is at or below'],['insLo','Heat pack + insulated box at or below'],['packLo','Heat pack at or below'],['coldHi','Cold pack if the high is at or above'],['stationHi','Ship to a carrier location at or above'],['holdHi','Hold if the high is at or above']];
+
+/* hubs people actually route through */
+var HUB_PRESETS = {
+  fedex: [['38118','Memphis','FedEx World Hub'],['46241','Indianapolis','FedEx hub'],['75261','Fort Worth','FedEx Alliance hub']],
+  ups:   [['40209','Louisville','UPS Worldport'],['60525','Chicago','UPS Hodgkins'],['31907','Columbus GA','UPS']],
+  usps:  []
+};
+/* carrier holidays, worked out by rule for any year. FedEx/UPS close on New Year's, Memorial Day, July 4, Labor Day, Thanksgiving
+   and Christmas (the weekday it is observed); USPS also keeps MLK, Presidents, Juneteenth, Columbus and Veterans Day. */
+var HOLCACHE = {};
+function nthDow(y, m, w, n){ var d = new Date(Date.UTC(y, m, 1, 12)), c = 0; while(true){ if(d.getUTCDay() === w && ++c === n) return d.toISOString().slice(0, 10); d.setUTCDate(d.getUTCDate() + 1); } }
+function lastDow(y, m, w){ var d = new Date(Date.UTC(y, m + 1, 0, 12)); while(d.getUTCDay() !== w) d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); }
+function fixedDay(y, m, day){ var s = y + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + day).slice(-2), w = dow(s); return [s, w === 6 ? addDays(s, -1) : w === 0 ? addDays(s, 1) : s]; }
+function holidays(y){
+  if(HOLCACHE[y]) return HOLCACHE[y];
+  var all = {}, usps = {};
+  function put(map, list, name){ list.forEach(function(d){ if(d.slice(0, 4) === String(y)) map[d] = name; }); }
+  [[fixedDay(y, 0, 1), 'New Year\'s Day'], [[lastDow(y, 4, 1)], 'Memorial Day'], [fixedDay(y, 6, 4), 'Independence Day'], [[nthDow(y, 8, 1, 1)], 'Labor Day'], [[nthDow(y, 10, 4, 4)], 'Thanksgiving'], [fixedDay(y, 11, 25), 'Christmas'], [fixedDay(y + 1, 0, 1), 'New Year\'s (observed)']]
+    .forEach(function(h){ put(all, h[0], h[1]); put(usps, h[0], h[1]); });
+  [[[nthDow(y, 0, 1, 3)], 'Martin Luther King Jr. Day'], [[nthDow(y, 1, 1, 3)], 'Presidents Day'], [fixedDay(y, 5, 19), 'Juneteenth'], [[nthDow(y, 9, 1, 2)], 'Columbus Day'], [fixedDay(y, 10, 11), 'Veterans Day']]
+    .forEach(function(h){ put(usps, h[0], h[1]); });
+  return (HOLCACHE[y] = {all:all, usps:usps});
+}
+function holidayName(s, carrier){ var h = holidays(+s.slice(0, 4)); return (carrier === 'usps' ? h.usps : h.all)[s] || ''; }
+
+/* ---------- dates as YYYY-MM-DD strings ---------- */
+function addDays(s, n){ var d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function dow(s){ return new Date(s + 'T12:00:00Z').getUTCDay(); }
+function todayLocal(now){ var d = now || new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+var WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function dayName(s){ return WD[dow(s)] + ' ' + MO[+s.slice(5, 7) - 1] + ' ' + (+s.slice(8, 10)); }
+function isDeliveryDay(s, carrier){ if(holidayName(s, carrier)) return false; var w = dow(s); if(w === 0) return false; if(w === 6) return carrier === 'usps'; return true; }
+function arrivalDate(ship, n, carrier){ var d = ship, k = 0, guard = 0; while(k < n && guard++ < 30){ d = addDays(d, 1); if(isDeliveryDay(d, carrier)) k++; } return d; }
+
+/* ---------- the route: every place and half-day the box is exposed ----------
+   part 'N' = that date's night (its low, the cold check), part 'D' = that date's daytime (its high, the heat check). */
+function route(ship, c){
+  var A = arrivalDate(ship, c.service, c.carrier), ex = [], d;
+  ex.push({at:'origin', key:c.origin, date:ship, part:'D'});
+  if(!c.dropDay) ex.push({at:'origin', key:c.origin, date:ship, part:'N'});
+  for(d = addDays(ship, 1); d < A; d = addDays(d, 1)){
+    if(c.hubs.length) c.hubs.forEach(function(h){ ex.push({at:'hub', key:h, date:d, part:'D'}); });
+    else { ex.push({at:'transit', key:c.origin, date:d, part:'D'}); ex.push({at:'transit', key:c.dest, date:d, part:'D'}); }
+  }
+  for(d = ship; d < addDays(A, -1); d = addDays(d, 1)){   // nights between leaving you and the last night before delivery
+    if(c.hubs.length) c.hubs.forEach(function(h){ ex.push({at:'hub', key:h, date:d, part:'N'}); });
+    else if(d !== ship){ ex.push({at:'transit', key:c.origin, date:d, part:'N'}); ex.push({at:'transit', key:c.dest, date:d, part:'N'}); }
+  }
+  if(c.hubs.length && addDays(A, -1) !== ship) c.hubs.forEach(function(h){ ex.push({at:'hub', key:h, date:addDays(A, -1), part:'N'}); });
+  if(c.hubs.length && addDays(A, -1) === ship) c.hubs.forEach(function(h){ ex.push({at:'hub', key:h, date:ship, part:'N'}); });
+  ex.push({at:'door', key:c.dest, date:addDays(A, -1), part:'N'});   // on the truck the morning it arrives
+  ex.push({at:'door', key:c.dest, date:A, part:'D'});
+  if(c.buffer){
+    var A2 = arrivalDate(A, 1, c.carrier);
+    for(d = A; d < A2; d = addDays(d, 1)) ex.push({at:'door', key:c.dest, date:d, part:'N', late:true});
+    ex.push({at:'door', key:c.dest, date:A2, part:'D', late:true});
+  }
+  var nights = 0; for(d = ship; d < A; d = addDays(d, 1)) nights++;
+  return {ship:ship, arrive:A, nights:nights, ex:ex};
+}
+
+/* forecast lookup: wx[key] = {map:{'2026-11-24|N':38,...}, first:'2026-11-24', last:'2026-11-30', place:'Memphis, TN'} */
+function tempAt(wx, e){
+  var w = wx[e.key];
+  if(!w) return {miss:'nodata'};
+  if(w.err) return {miss:'err'};
+  var k = e.date + '|' + e.part;
+  if(Object.prototype.hasOwnProperty.call(w.map, k)) return {t:w.map[k]};
+  if(e.date < w.first || (e.date === w.first && e.part === 'D')) return {past:true};
+  return {miss:'beyond'};
+}
+
+var RANK = {ok:0, box:1, coldpack:2, pack:3, insulate:4, station:5, mixed:6, unknown:7, hold:8};
+var SHIPPABLE = {ok:1, box:1, coldpack:1, pack:1, insulate:1, station:1};
+var PACKS = [40, 60, 72, 96];   // heat pack sizes sold (hours)
+function judge(r, wx, th){
+  var lo = null, hi = null, missing = null, lateSkipped = false, seen = [];
+  r.ex.forEach(function(e){
+    var t = tempAt(wx, e); seen.push({e:e, r:t});
+    if(t.past) return;
+    if(t.miss){ if(e.late && t.miss === 'beyond'){ lateSkipped = true; return; }   // the day-late check only counts once it is inside the forecast
+      if(!missing || t.miss === 'err' || t.miss === 'nodata') missing = t.miss; return; }
+    if(lo === null || t.t < lo.t) lo = {t:t.t, e:e};                          // cold: the coldest reading, night or day
+    if(e.part === 'D' && (hi === null || t.t > hi.t)) hi = {t:t.t, e:e};     // heat: the hottest afternoon
+  });
+  var cold = 'ok', hot = 'ok';
+  if(lo){ if(th.holdLo != null && lo.t <= th.holdLo) cold = 'hold'; else if(th.insLo != null && lo.t <= th.insLo) cold = 'insulate'; else if(th.packLo != null && lo.t <= th.packLo) cold = 'pack'; }
+  if(hi){ if(th.holdHi != null && hi.t >= th.holdHi) hot = 'hold'; else if(th.stationHi != null && hi.t >= th.stationHi) hot = hi.e.at === 'door' ? 'station' : 'coldpack'; else if(th.coldHi != null && hi.t >= th.coldHi) hot = 'coldpack'; }
+  // a hot afternoon somewhere other than the buyer's door: a pickup at the buyer's carrier location doesn't help, so cold pack
+  var packHrs = 0, packShort = false;
+  if(cold === 'pack' || cold === 'insulate'){
+    var need = r.nights * 24 + 16; packHrs = PACKS.filter(function(h){ return h >= need; })[0] || 0;
+    if(!packHrs){ packShort = true; cold = 'hold'; }                           // longer in transit than any heat pack lasts
+  }
+  var kind;
+  if(cold === 'hold' || hot === 'hold') kind = 'hold';
+  else if(missing) kind = 'unknown';
+  else if(cold === 'pack' && hot === 'coldpack') kind = lo.t > th.packLo - 5 ? 'box' : 'insulate';   // warm days: insulated box; no heat pack only if the night is barely in the heat-pack band
+  else if(cold !== 'ok' && hot !== 'ok') kind = 'mixed';
+  else if(cold !== 'ok') kind = cold;
+  else if(hot !== 'ok') kind = hot;
+  else kind = 'ok';
+  var because = kind === 'hold' ? ((packShort || cold === 'hold') ? lo : hi) : (kind === 'box' || kind === 'mixed') ? lo : (cold !== 'ok' ? lo : (hot !== 'ok' ? hi : null));
+  if(kind !== 'pack' && kind !== 'insulate') packHrs = 0;
+  return {kind:kind, lo:lo, hi:hi, because:because, missing:missing, heat:hot === 'hold' && cold !== 'hold' && !packShort, packShort:packShort, lateSkipped:lateSkipped, packHrs:packHrs, nights:r.nights, seen:seen};
+}
+
+/* the next ship day that clears, within the forecast */
+function nextSafe(fromShip, c, wx, th, shipDays){
+  for(var i = 1; i <= 9; i++){
+    var d = addDays(fromShip, i);
+    if(shipDays.indexOf(dow(d)) < 0 || holidayName(d, c.carrier)) continue;
+    var j = judge(route(d, c), wx, th);
+    if(SHIPPABLE[j.kind]) return {date:d, j:j};
+    if(j.kind === 'unknown') return j.missing === 'beyond' ? {date:d, beyond:true} : {date:d, err:true};
+  }
+  return null;
+}
+
+/* ---------- reading pasted orders ---------- */
+function splitCSV(text, sep){
+  var rows = [], row = [], cell = '', q = false, i, ch;
+  for(i = 0; i < text.length; i++){
+    ch = text[i];
+    if(q){ if(ch === '"'){ if(text[i + 1] === '"'){ cell += '"'; i++; } else q = false; } else cell += ch; continue; }
+    if(ch === '"' && cell === ''){ q = true; continue; }
+    if(ch === sep){ row.push(cell); cell = ''; continue; }
+    if(ch === '\n' || ch === '\r'){ if(ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; continue; }
+    cell += ch;
+  }
+  if(cell !== '' || row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(function(r){ return r.some(function(x){ return String(x).trim() !== ''; }); });
+}
+function findCol(h, res, not){ for(var k = 0; k < res.length; k++) for(var i = 0; i < h.length; i++) if(res[k].test(h[i]) && !(not && not.test(h[i]))) return i; return -1; }
+var US_RE = /^(|us|usa|u\.s\.a?\.?|united states( of america)?|pr|puerto rico)$/i;
+var MILITARY = /^(09\d|340|96[2-6])/;   // APO/FPO/DPO: no forecast for where the box really goes
+function cleanZip(z, padShort){
+  z = String(z || '').trim().replace(/^'/, '');
+  var m = z.match(/^(\d{5})(?:-?\d{4})?$/); if(m) return m[1];
+  if(padShort && /^\d{3,4}$/.test(z)) return ('00000' + z).slice(-5);   // spreadsheet dropped the leading zeros
+  return '';
+}
+var STATES = 'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR VI GU AS MP AA AE AP';
+/* the ZIP on one pasted line: never a number after "#" or "order"; a number after a state code wins; a number that starts a
+   line followed by words is a house number, not a ZIP */
+function zipOnLine(l){
+  var m, c = [], re = /(^|[^\d-])(\d{5})(?:-\d{4})?(?!\d)/g;
+  while((m = re.exec(l))){
+    var idx = m.index + m[1].length, before = l.slice(Math.max(0, idx - 8), idx), after = l.slice(idx + 5);
+    var st = /\b([A-Z]{2})[\s,.]+$/.exec(l.slice(0, idx)), isState = !!(st && STATES.indexOf(st[1]) >= 0);
+    if(!isState && (/#\s*$/.test(before) || /(?:^|[^A-Za-z])(order|ord|invoice|inv|num|number|no\.|p\.?\s?o\.?(\s?box)?|box|apt|suite|ste|unit)\s*[:#]?\s*$/i.test(before))) continue;
+    c.push({zip:m[2], idx:idx, len:m[0].length - m[1].length, state:isState, house:idx === l.search(/\S/) && /^(-\d{4})?\s+[A-Za-z]/.test(after)});
+  }
+  var s = c.filter(function(x){ return x.state; }); if(s.length) return s[s.length - 1];
+  c = c.filter(function(x){ return !x.house; });
+  return c.length ? c[c.length - 1] : null;
+}
+function cleanName(n){ return String(n || '').replace(/^(order|ord)\s*#?\s*\d+\s*/i, '').replace(/[\t,;|]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function parseOrders(text){
+  text = String(text || '').replace(/^﻿/, '');
+  var lines = text.split(/\r?\n/);
+  var out = [], skipped = [], note = '';
+  if(!lines.some(function(l){ return l.trim(); })) return {orders:out, skipped:skipped, mode:'none'};
+  var head = lines.filter(function(l){ return l.trim(); })[0], sep = head.indexOf('\t') >= 0 ? '\t' : (head.indexOf(',') >= 0 ? ',' : (head.indexOf(';') >= 0 ? ';' : ''));
+  var hcells = sep ? splitCSV(head, sep)[0] || [] : [];
+  var looksHeader = hcells.length >= 2 && !/\d{5}/.test(head);
+  var SHIPZ = [/(ship|deliver|recipient).*(zip|postal|post ?code)/i, /(zip|postal|post ?code).*(ship|deliver|recipient)/i];
+  var zc = looksHeader ? findCol(hcells, SHIPZ) : -1;
+  if(looksHeader && zc < 0){
+    zc = findCol(hcells, [/^(zip|zip ?code|postal ?code|postcode|post code)$/i, /(zip|postal|postcode|post code)/i], /bill/i);
+    if(zc < 0){ zc = findCol(hcells, [/(zip|postal|postcode|post code)/i]); if(zc >= 0) note = 'Using the billing ZIP: there is no shipping ZIP column, so gift orders may be checked at the wrong address.'; }
+  }
+  if(zc >= 0 && !splitCSV(text, sep).slice(1).some(function(r){ return cleanZip(r[zc], true); })) zc = -1;   // a heading like "name, zip" over plain lines
+  if(zc >= 0){
+    var rows = splitCSV(text, sep), h = rows[0], BAD = /note|message|company|item|product|title|sku|bill/i;
+    var nameC = findCol(h, [/^ship(ping)?[ _-]?(full[ _-]?)?name$/i, /(full ?name|^name).*(ship|deliver|recipient)/i, /^(recipient|recipient ?name|buyer ?name|customer ?name|full ?name)$/i], BAD);
+    var firstC = findCol(h, [/first.*(ship|deliver)|(ship|deliver).*first/i, /^first ?name$/i], /bill/i), lastC = findCol(h, [/last.*(ship|deliver)|(ship|deliver).*last/i, /^last ?name$/i], /bill/i);
+    if(nameC < 0 && firstC < 0) nameC = findCol(h, [/^billing ?name$/i, /^name$/i, /^(customer|buyer)$/i], /note|message/i);
+    var idC = findCol(h, [/^order ?(id|number|no\.?|#)$/i, /^order$/i, /^name$/i]);
+    var cc = findCol(h, [/ship.*country|country.*ship/i, /^country( ?code)?$/i], /bill/i);
+    var emC = findCol(h, [/^(e-?mail|buyer ?e-?mail|customer ?e-?mail|e-?mail.*bill.*|bill.*e-?mail)$/i]);
+    var shippedC = findCol(h, [/^date ?shipped$/i]), fulfilC = findCol(h, [/^fulfill?ment ?status$/i]), cancelC = findCol(h, [/^cancell?ed ?at$/i]);
+    var seen = {}, merged = 0;
+    rows.slice(1).forEach(function(r){
+      var id = idC >= 0 ? String(r[idC] || '').trim() : '';
+      if(id && idC === nameC && !/^#?\d/.test(id)) id = '';
+      var nm = nameC >= 0 ? String(r[nameC] || '').trim() : '';
+      if(!nm && firstC >= 0) nm = (String(r[firstC] || '') + ' ' + (lastC >= 0 ? String(r[lastC] || '') : '')).trim();
+      var zraw = String(r[zc] || '').trim(), z = cleanZip(zraw, true);
+      if(id && seen[id] && (!zraw || seen[id] === z)){ merged++; return; }   // the same order again (Shopify repeats line items)
+      if(id && !seen[id]) seen[id] = z || '-';
+      var country = cc >= 0 ? String(r[cc] || '').trim() : '';
+      var label = nm || id || r.join(', ').slice(0, 60);
+      if(shippedC >= 0 && String(r[shippedC] || '').trim()){ skipped.push({raw:label, why:'already shipped'}); return; }
+      if(fulfilC >= 0 && /^fulfilled$/i.test(String(r[fulfilC] || '').trim())){ skipped.push({raw:label, why:'already fulfilled'}); return; }
+      if(cancelC >= 0 && String(r[cancelC] || '').trim()){ skipped.push({raw:label, why:'cancelled'}); return; }
+      if(country && !US_RE.test(country)){ skipped.push({raw:label, why:'outside the US (' + country + ')'}); return; }
+      if(!z){ if(!zraw && !nm && !id) return; skipped.push({raw:label, why:'no US ZIP'}); return; }
+      if(MILITARY.test(z)){ skipped.push({raw:label, why:'military APO/FPO address: no forecast'}); return; }
+      out.push({id:id, name:nm, zip:z, email:emC >= 0 ? String(r[emC] || '').trim() : ''});
+    });
+    return {orders:out, skipped:skipped, mode:'csv', note:note, merged:merged};
+  }
+  /* pasted lines: one order per line ("name, ZIP"), or address blocks (name / street / city ST ZIP), blank lines between */
+  var buf = [], dup = {}, pendId = '', merged = 0;
+  function flush(why){ buf.forEach(function(b){ if(b.trim()) skipped.push({raw:b.trim().slice(0, 60), why:why}); }); buf = []; pendId = ''; }
+  lines.forEach(function(l){
+    if(!l.trim()){ flush('no 5-digit ZIP'); return; }
+    var t = l.trim();
+    if(/^(united states( of america)?|usa|u\.s\.a?\.?|us)$/i.test(t)) return;                               // country line under an address
+    if(/^(ship(ping)?\s*(to|address)|deliver(y)?\s*(to|address)|recipient)\s*:?\s*$/i.test(t)) return;     // "SHIP TO:" headings
+    var om = t.match(/^order\s*(?:no\.?|number|#)?\s*:?\s*(#?\s?[\w-]+)\s*$/i);
+    if(om && /\d/.test(om[1])){ flush('no 5-digit ZIP'); pendId = (om[1][0] === '#' ? '' : '#') + om[1].replace(/\s/g, ''); return; }   // "Order #3412345678" starts a block
+    var z = zipOnLine(l);
+    if(!z){
+      if(/\b[A-Za-z]\d[A-Za-z] ?\d[A-Za-z]\d\b/.test(l)){ buf = []; skipped.push({raw:l.trim().slice(0, 60), why:'looks Canadian: US ZIPs only'}); return; }
+      buf.push(l); if(buf.length > 6){ var keep = pendId; flush('no 5-digit ZIP'); pendId = keep; } return;
+    }
+    var raw = l.slice(0, z.idx) + ' ' + l.slice(z.idx + z.len), id = pendId, nm;
+    var lid = raw.match(/^\s*(?:order|ord)\s*#?\s*(\d+)\b/i); if(lid){ id = '#' + lid[1]; raw = raw.replace(/^\s*(?:order|ord)\s*#?\s*\d+/i, ''); }
+    var rest = cleanName(raw); nm = rest;
+    if(buf.length && (z.state || !rest)){
+      var nameLine = buf.filter(function(b){ return !/\d/.test(b.replace(/#\s?[\w-]+/, '')); })[0] || buf[0];
+      var idm = nameLine.match(/(?:^|\s)(#\s?[\w-]+)/); if(idm && !id) id = idm[1].replace(/\s/g, '');
+      nm = cleanName(nameLine.replace(/#\s?[\w-]+/, '')); buf = []; pendId = '';
+    }
+    else { var keepId = pendId; flush('no 5-digit ZIP'); id = id || keepId; var m2 = rest.match(/^(#\s?\S+)\s+(.*)$/); if(m2){ id = m2[1].replace(/\s/g, ''); nm = m2[2]; } else { var m3 = rest.match(/^(.*?)\s*(#\s?\S+)$/); if(m3){ id = m3[2].replace(/\s/g, ''); nm = m3[1].replace(/\s*\b(order|ord|no\.?|number)$/i, ''); } } }
+    if(MILITARY.test(z.zip)){ skipped.push({raw:(nm || z.zip), why:'military APO/FPO address: no forecast'}); return; }
+    var k = (id || nm) + '|' + z.zip; if(dup[k]){ merged++; return; } dup[k] = 1;
+    out.push({id:id, name:nm, zip:z.zip, email:''}); pendId = '';
+  });
+  flush('no 5-digit ZIP');
+  return {orders:out, skipped:skipped, mode:'lines', merged:merged};
+}
+
+/* ---------- ZIP table (US Census ZCTA centers), loaded on first use ---------- */
+var ZIPS = null, ZIP3 = null, ZTOWN = {}, zipLoading = null;
+function loadZips(){
+  if(ZIPS) return Promise.resolve(ZIPS);
+  if(zipLoading) return zipLoading;
+  zipLoading = fetch('zips.txt').then(function(r){ if(!r.ok) throw new Error('zip table ' + r.status); return r.text(); }).then(function(t){
+    var z = {}, z3 = {};
+    t.split('\n').forEach(function(l){ if(!l || l[0] === '#') return; var p = l.split(' '); if(p.length < 3) return;
+      var la = +p[1] / 100, lo = +p[2] / 100; z[p[0]] = [la, lo]; if(p[3]) ZTOWN[p[0]] = p[3].replace(/_/g, ' ').replace(',', ', ');
+      var k = p[0].slice(0, 3), a = z3[k] || (z3[k] = [0, 0, 0]); a[0] += la; a[1] += lo; a[2]++; });
+    Object.keys(z3).forEach(function(k){ var a = z3[k]; z3[k] = [a[0] / a[2], a[1] / a[2]]; });
+    ZIPS = z; ZIP3 = z3; return z;
+  });
+  zipLoading.catch(function(){ zipLoading = null; });
+  return zipLoading;
+}
+function zipLL(zip){ if(!ZIPS) return null; return ZIPS[zip] || ZIP3[zip.slice(0, 3)] || null; }
+function zipApprox(zip){ return !!(ZIPS && !ZIPS[zip] && ZIP3[zip.slice(0, 3)]); }
+
+/* ---------- National Weather Service forecasts ---------- */
+var WX = {}, WXQ = {}, CUR = WX;   // CUR = the forecasts the results on screen were made from (WX, or the example's sample)
+function nwsTemp(p){ var t = p.temperature; if(t && typeof t === 'object') t = t.value; if(t == null) return null; if(p.temperatureUnit === 'C' || (p.temperature && p.temperature.unitCode === 'wmoUnit:degC')) t = t * 9 / 5 + 32; return Math.round(t); }
+function forecastToMap(periods){
+  var map = {}, first = null, last = null;
+  periods.forEach(function(p){
+    var t = nwsTemp(p); if(t == null) return;
+    var date = String(p.startTime).slice(0, 10), hr = +String(p.startTime).slice(11, 13);
+    if(!p.isDaytime && hr < 12) date = addDays(date, -1);   // an "Overnight" period that starts after midnight belongs to the night before
+    var k = date + '|' + (p.isDaytime ? 'D' : 'N');
+    if(!(k in map) || (p.isDaytime ? t > map[k] : t < map[k])) map[k] = t;
+    if(!first || date < first) first = date;
+    if(!last || date > last) last = date;
+  });
+  return {map:map, first:first, last:last};
+}
+function getJSON(url, tries){
+  tries = tries || 0;
+  return fetch(url, {headers:{'Accept':'application/geo+json'}}).then(function(r){
+    if(r.ok) return r.json();
+    if(r.status === 404) { var e = new Error('nws 404'); e.code = 404; throw e; }
+    throw new Error('nws ' + r.status);
+  }).catch(function(err){
+    if(err.code === 404 || tries >= 2) throw err;
+    return new Promise(function(res){ setTimeout(res, 700 * (tries + 1)); }).then(function(){ return getJSON(url, tries + 1); });
+  });
+}
+function pointFor(ll){
+  var pk = 'sh.pt.' + ll[0].toFixed(2) + ',' + ll[1].toFixed(2), pt = lsGet(pk, null);
+  if(pt && Date.now() - pt.at < 7 * 864e5) return Promise.resolve(pt);
+  return getJSON('https://api.weather.gov/points/' + ll[0].toFixed(4) + ',' + ll[1].toFixed(4)).then(function(j){
+    var pr = j.properties || {}, rl = pr.relativeLocation && pr.relativeLocation.properties || {}, dm = rl.distance && rl.distance.value;
+    var o = {url:pr.forecast, place:(rl.city ? rl.city + ', ' + rl.state : ''), mi:dm ? Math.round(dm / 1609) : 0, at:Date.now()}; lsSet(pk, o); return o;
+  });
+}
+function forecastFor(ll){ return pointFor(ll).then(function(o){ return getJSON(o.url).then(function(j){ var m = forecastToMap((j.properties && j.properties.periods) || []); return {map:m.map, first:m.first, last:m.last, place:o.place, mi:o.mi, at:Date.now()}; }); }); }
+function fetchWx(zip){
+  if(WX[zip] && !WX[zip].err && Date.now() - WX[zip].at < 45 * 60e3) return Promise.resolve(WX[zip]);
+  if(WXQ[zip]) return WXQ[zip];
+  var ll = zipLL(zip);
+  if(!ll){ WX[zip] = {err:'zip', at:Date.now()}; return Promise.resolve(WX[zip]); }
+  WXQ[zip] = forecastFor(ll).catch(function(e){
+      // a ZIP centre that falls on water gets "Marine Forecast Not Supported" (404): try the centre of its 3-digit area instead
+      var alt = ZIP3 && ZIP3[zip.slice(0, 3)];
+      if(e && e.code === 404 && alt && (alt[0] !== ll[0] || alt[1] !== ll[1])) return forecastFor(alt).then(function(w){ w.water = true; return w; });
+      throw e; })
+    .then(function(w){ if(zipApprox(zip)) w.approx = true; WX[zip] = w; return w; },
+          function(e){ WX[zip] = {err:(e && e.code === 404) ? 'nws404' : 'busy', at:Date.now()}; return WX[zip]; })
+    .then(function(w){ delete WXQ[zip]; return w; });
+  return WXQ[zip];
+}
+var ERRTXT = {zip:'ZIP not found: check it', nws404:'the weather service has no forecast for this ZIP', busy:'the weather service didn\'t answer: press Check again in a minute'};
+function pool(items, n, fn){
+  var i = 0, out = [];
+  function next(){ if(i >= items.length) return Promise.resolve(); var k = i++; return Promise.resolve(fn(items[k], k)).then(function(v){ out[k] = v; return next(); }); }
+  var w = []; for(var j = 0; j < Math.min(n, items.length); j++) w.push(next());
+  return Promise.all(w).then(function(){ return out; });
+}
+
+/* ---------- state ---------- */
+var KEY = 'sh.v1', PROKEY = 'sh.pro', FREE_MAX = 5;
+function blank(){ return {v:1, origin:'', carrier:'fedex', service:2, hubs:['38118'], preset:'plants', th:th0('plants'), buffer:true, shipDays:[1,2,3], ship:'', orders:'', shop:'', example:false}; }
+function th0(k){ var p = PRESETS[k] || PRESETS.custom, o = {}; TH_KEYS.forEach(function(t){ o[t[0]] = p[t[0]]; }); return o; }
+var S = blank();
+function load(){
+  var o = lsGet(KEY, null); if(!o || o.v !== 1) return false;
+  S = Object.assign(blank(), o);
+  if(!Array.isArray(S.hubs)) S.hubs = []; if(!Array.isArray(S.shipDays) || !S.shipDays.length) S.shipDays = [1,2,3];
+  if(!PRESETS[S.preset]) S.preset = 'custom';
+  if(!S.th || typeof S.th !== 'object' || TH_KEYS.some(function(k){ return !(k[0] in S.th) || (S.th[k[0]] !== null && !isFinite(S.th[k[0]])); })) S.th = th0(S.preset);
+  if(typeof S.edits !== 'object' || !S.edits) S.edits = {};
+  S.service = [1,2,3].indexOf(+S.service) >= 0 ? +S.service : 2;
+  return true;
+}
+function save(){ if(!S.example) lsSet(KEY, S); }
+
+/* ---------- Pro ---------- */
+var SITE = 'https://samsbench.com/ship-or-hold/';
+var CHECKOUT_PLAN = 'plan_Ntju6s6EFi03c';   // Whop product prod_qaZxRSIJ35SW9, $19 one-time (suggested price, awaiting user review); ?a=<affiliate> uses this plan link
+var CHECKOUT_REDIRECT = 'https://whop.com/checkout/ch_wZkTU8AZ96rjWXQ/';   // same plan, returns buyers to SITE?bought=1#proSec
+var VERIFY_URL = 'https://app-bizz-api.whop.site/api/verify';
+var APP_KEY = 'ship-or-hold';
+var PRICE = '$19';
+var GIFT_SHA256 = ["118e61a44996e75b20d7d03d395059a7ba51583324eb7076a9e2a213431209ce", "8f728309d97df111d9b6245e87d28224565d9c7f8061ec00a122b2b0e64360a2", "59806f9f1a6546be67181b7f8f4e1d59a8d59341c54bd3f3b705979a25f42dd5", "3348968bf792625b574cafcb56b5ca5df1a8751e1715e75daaee00cda86f7d0d", "fdc9228a84f8abaa8b9ebd94815fcf7b26cf4a5b9a0785710373b66ad3bf5f30", "4ad3179dbd40a79a97552f95da173f51f087ff150039201123701aa091c92514", "09fa727fe65b99bf08e83959d21cf3dc89f232e83428c13201390a1bcc0805d6", "be676735f27a6c3a9382d8e996edd55f31a4a1dcf325518291d7aa6915c83034", "ce8dc7f348cec85e941eb13b216122f52b615e5c2c9bcf1f496a2e3886237274", "a677fe951f30bb17d883d91ad616fea0f8807853751431f94cbe6e0c6d6432f3", "382c4a621d4c978a6df4c0ed6894f500167b00169d64df1b8fadb0b28b9149ad", "54dd8286b73d2c0d896adcfe56d8d77c35544bf3b5ee0634faf58d6ba382fead", "65cd8c426f7e6f80312ca118d91bbdc4fae31ebc678cb34fcc7b0a189d31af3d", "1a0b59dfb5811b89721e054976d0a9f28d0866d67f3c3f36fd6007307bef1bdc", "6e93760e664472141ea1b51ce77222fe4a8946943ffa3c4e9b0fffcdda19cd17", "3f96515bf15e9c6005c9090da6b827d62dcacdee3b3819103b2fd777d59ac2a8", "ca208577247a790d0a779993310f203180427c812881fe2724a2dd904168333b", "ec24451beb19c909ac24933720fcf219e0607ca4a2c89ca45b58c83df7ede3d9", "128c3b036f7b49b5774c81ae1d6a274bfd36b8557c55be6ee683f64968dddc29", "d699d3105ebece96b5c5617792f3efe312ff0b8c59d57d4ad2460357bbc7fe78", "90ff0dfaf4f33980cb5c9c9dbd0d8999cfe932ab0b7e8c91466aed1a5a6d86d1", "26468aeed780e258324edb1d27aaa66e0b10eafa311732153ae65a576954890d", "c38f6b55518e089f92f303289fbfaaaa2fc68fbffffa1a048b56125801efe439", "c9db8aacc66f80f5c04ecaca0e7232f735cb89e39dc7951e57052dcad325de82", "02f3b68dbef4ba6d4697930f64c156da141ed91e592278b2036488f786ab2444", "a743bfa0a5c177601a1443a969d63264152389185388ef54b6b6d9b47b705ee4", "8608c59a3f9246032af45feb107ba4c0f2a9c74f89ceda1ecd37ffa6fe09dc5a", "2c2aacca5f2ed5a9335a2505b6cb270c04b21ae6d24255087dc2adfd676640f2", "8704d7d74d74bac6a94d509d59ee2bda7e709ba8c26b0e569f20406226d223d8", "cf0279e4b7e018f787580bbfe1a3b3823f9a2d80ac222ab5efec88a7c354ee4c", "b3579b6238c576bebaa9bbaeb9ae636f1af55da2ffa0db65bfa1b26175a47032", "0d817b5492ca0b0a2e3dc3fd40be7acfcec0e42d9a71fd09cc0408b64f5a4063", "340a5d877d972a4ed005e4b5b41e69311c1c4e02193bbd37902a5e9c45655023", "f80ad04040ef68611e97d4b77375d7844e86831bc31dda044f21df69ae8a778f", "0705f21039e280394a6774eecdbfb1c59d268c2bde0eb1f446aa6cad60909f18", "9d18c82d391c0aaaf56eb7c9476eb07e43950602ad64cfa308d839e93ef6a57a", "0b76f0f9a6e8388d7e0746d2acfc7c218d22d5419aec471fb8b43790db34c37c", "e2bf966076f6b2d4706b7d16b0f24eb52b68063f3c5ead1641b1fea832cd9d64", "38563f6fd83438fdc8de7d5141638d816282593def0919e5ccf1b2e053180022", "1cff8ae995ef43e4045afe45bc8766bc42940cbf8813339f3cda3ceceb3a91ec", "a711134205325127c1ed12791cafe4d8281182f5a110ae54dab664ac09081cae", "93de5f0282c3494f837920429d9ce388b591ef08689a86dc2664e75040bf1bd2", "9bd50e46be8a7acdd2c987b8b3f5f0591e370d1a6e84c6f1fbfad12a5b0540b4", "e1a5d107edbde216ca873039546233a98d7af70ce49492532acb0e7db299556e", "16bfebab0dd7fa3092502e4842b2e9bc0ec713d42bb5733a4e9557bf81c18015", "24afba43bd8cb94f604654207a0088d0b3677cb3a9db86c5a95844c52b3c9cdc", "b54e21fefd8ce37a80a71a0c3b33890b76a4361e10884a04fc72f0ab8ebcfe9e", "9ea0d04c7cd1d7018c7c12963099716ad9a437c906784730d079133d78082feb", "c6988cefa9cacb0397a1d6f62ceba5de195e58bf1349525f5b196e7fa647f70a", "c3c944f5bff0d496e2f6b8acde3727ccc8f0dd903d75e123b99780d199e8dc1d", "98ab49daee4c0d753b18692ee53dde524ae064418377cdf5998de58e2d8ea7ca", "8790108ab7ea4d1f055b7ca1d51232e1e10344c48ae2918eaedbd59e6c9b0c5a", "6cb3c4d34e63dc4e22dccc13607ee08ccdf45bb7a67229524ac4305ac1155a0e", "d1584c5d25e45419e1b2916a11dd944c6f295d3f9b9b90f67d8c74d999244ad8", "dc85d2bfeb2c3f4b2cf34152989f8718586864592a4933ddd2dc41593af9f415"];   // 55 first-letter codes, 11-24 (outreach/gift_codes.csv, not published)
+var PRO = {key:'', kind:''};
+function loadPro(){ var o = lsGet(PROKEY, null); if(o) PRO = Object.assign(PRO, o); }
+function isPro(){ return !!PRO.key; }
+function affCode(){
+  var a = ''; try{ a = new URLSearchParams(location.search).get('a') || ''; }catch(e){}
+  a = a.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
+  try{ if(a) localStorage.setItem('sh.aff', a); else a = localStorage.getItem('sh.aff') || ''; }catch(e){}
+  return a;
+}
+function buyUrl(){ var a = affCode(); if(!CHECKOUT_PLAN) return ''; return a ? 'https://whop.com/checkout/' + CHECKOUT_PLAN + '?a=' + encodeURIComponent(a) : (CHECKOUT_REDIRECT || 'https://whop.com/checkout/' + CHECKOUT_PLAN); }
+function checkGift(code){
+  var c = String(code || '').toUpperCase().replace(/\s+/g, '');
+  if(!window.crypto || !crypto.subtle || !GIFT_SHA256.length) return Promise.resolve(false);
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(c)).then(function(buf){
+    var hex = Array.prototype.map.call(new Uint8Array(buf), function(b){ return ('0' + b.toString(16)).slice(-2); }).join('');
+    return GIFT_SHA256.indexOf(hex) >= 0;
+  });
+}
+function verifyLicense(email){
+  return fetch(VERIFY_URL, {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({app:APP_KEY, email:email})})
+    .then(function(r){ return r.json(); }).then(function(j){ if(j && j.ok) return j; throw new Error('check failed'); });
+}
+
+/* ---------- measurement (GoatCounter) ----------
+   Every count goes through one queue 700 ms apart (GoatCounter drops more than ~4/s per visitor); the first waits for count.js.
+   Funnel events are sent plain and again as "<event>.<via>", so each channel can be followed down to buy-click. */
+var GC_CODE = 'shiporhold';
+function cleanVia(v){ return String(v || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20); }
+var SRC = (function(){ try{
+  var q = new URLSearchParams(location.search), v = cleanVia(q.get('via')) || (q.get('a') ? 'aff' : '');
+  if(v){ if(v !== 'selftest') localStorage.setItem('sh.src', JSON.stringify({v:v, t:Date.now()})); return v; }
+  var o = JSON.parse(localStorage.getItem('sh.src') || 'null');   // last source on this device, kept 30 days
+  return o && Date.now() - o.t < 30 * 864e5 ? o.v : '';
+}catch(e){ return ''; } })();
+var FUNNEL_EV = {'example':1, 'tool-start':1, 'paste-orders':1, 'check-run':1, 'verdicts-ready':1, 'hold-found':1, 'next-day-found':1, 'pack-found':1, 'copy-note':1, 'export-copy':1, 'export-print':1, 'limit-hit':1, 'hub-limit':1, 'return-visit':1, 'pro-view':1, 'buy-click':1, 'bought-return':1, 'pro-unlocked':1, 'pro-unlocked-gift':1, 'unlock-fail':1};
+var GCQ = [], GCBUSY = false, ONCE = {};
+function gcDrain(){ if(!GCQ.length){ GCBUSY = false; return; } GCBUSY = true;
+  if(!(window.goatcounter && window.goatcounter.count)){ setTimeout(gcDrain, 500); return; }
+  var n = GCQ.shift(); try{ window.goatcounter.count({path:n, title:n, event:true}); }catch(e){} setTimeout(gcDrain, 700); }
+function gcCount(name){ if(!GC_CODE) return; GCQ.push(name); if(!GCBUSY){ GCBUSY = true; setTimeout(gcDrain, 1500); } }
+function track(name){ if(SRC === 'selftest'){ gcCount(name + '.selftest'); return; } gcCount(name); if(SRC && FUNNEL_EV[name]) gcCount(name + '.' + SRC); }
+function trackOnce(name){ if(ONCE[name]) return; ONCE[name] = 1; try{ if(sessionStorage.getItem('sh.once.' + name)) return; sessionStorage.setItem('sh.once.' + name, '1'); }catch(e){} track(name); }
+var started = false;
+function userEdit(){ if(S.example) return; if(!started){ started = true; trackOnce('tool-start'); } }   // nothing in the example counts as the user's own
+var SAVED = null;   // the user's own state, put aside while the example is on screen
+function leaveExample(){ if(!S.example) return; S = SAVED ? SAVED : blank(); S.example = false; SAVED = null; lastRun = null; CUR = WX; renderAll(); }
+
+/* ---------- settings panel ---------- */
+function shipChoices(now){
+  var t = todayLocal(now), out = [];
+  for(var i = 0; i < 7; i++) out.push(addDays(t, i));
+  return out;
+}
+function defaultShip(now){
+  var ch = shipChoices(now), h = (now || new Date()).getHours();
+  for(var i = 0; i < ch.length; i++){ if(i === 0 && h >= 15) continue; if(S.shipDays.indexOf(dow(ch[i])) >= 0 && !holidayName(ch[i], S.carrier)) return ch[i]; }
+  return ch[1];
+}
+function curShip(){ var ch = shipChoices(); if(S.ship && ch.indexOf(S.ship) >= 0) return S.ship; return defaultShip(); }
+function hubName(z){ var all = [].concat(HUB_PRESETS.fedex, HUB_PRESETS.ups); for(var i = 0; i < all.length; i++) if(all[i][0] === z) return all[i][1]; return ''; }
+function placeName(z){ if(CUR === WX && ZTOWN[z]) return ZTOWN[z]; var w = CUR[z] || WX[z]; return w && w.place ? w.place : ''; }
+
+function renderSettings(){
+  $('origin').value = S.origin;
+  $('carrier').value = S.carrier; $('service').value = String(S.service);
+  $('buffer').checked = !!S.buffer; $('dropDay').checked = !!S.dropDay;
+  // hubs
+  var hb = '';
+  S.hubs.forEach(function(z, i){ if(i > 0 && !isPro()){ hb += '<div class="hint">Hub ' + esc(z) + ' is saved but not checked: the free version checks one hub. <button class="btn small" type="button" data-delhub="' + i + '">Remove</button></div>'; return; }
+    hb += '<div class="hubrow"><input type="text" inputmode="numeric" maxlength="5" data-hub="' + i + '" value="' + esc(z) + '" aria-label="Hub ZIP ' + (i + 1) + '"><button class="btn small" type="button" data-delhub="' + i + '" aria-label="Remove hub ' + esc(hubName(z) || z) + '">Remove</button></div>'; });
+  $('hubs').innerHTML = hb;
+  var pres = HUB_PRESETS[S.carrier] || [];
+  var ph = pres.map(function(p){ var on = S.hubs.indexOf(p[0]) >= 0; return '<button class="chip" type="button" data-addhub="' + p[0] + '" aria-pressed="' + on + '">' + esc(p[1]) + '<small>' + esc(p[2]) + ' · ' + p[0] + '</small></button>'; }).join('');
+  ph += '<button class="chip off" type="button" data-addhub="">+ Other hub ZIP</button>';
+  $('hubPresets').innerHTML = ph;
+  $('hubHint').textContent = S.carrier === 'usps' ? 'USPS has no single hub: add the ZIP of the processing center your tracking usually shows, or leave it empty to check only your end and theirs.' :
+    (S.hubs.length ? 'Overnight air almost always goes through the main hub. Not sure? Look at an old tracking page.' : 'No hub: nights in transit are checked at your end and your buyer\'s end.') + (isPro() ? '' : ' Free: one hub. Pro: up to three.');
+  // goods
+  $('preset').innerHTML = Object.keys(PRESETS).map(function(k){ return '<option value="' + k + '"' + (S.preset === k ? ' selected' : '') + '>' + esc(PRESETS[k].label) + '</option>'; }).join('');
+  renderScale();
+  $('thGrid').innerHTML = TH_KEYS.map(function(t){ var v = S.th[t[0]]; return '<label for="th_' + t[0] + '">' + esc(t[1]) + ' (°F)</label><input type="text" inputmode="numeric" id="th_' + t[0] + '" data-th="' + t[0] + '" value="' + (v == null ? '' : esc(v)) + '" placeholder="off">'; }).join('');
+  // days
+  var ch = shipChoices(), cur = curShip();
+  $('days').innerHTML = ch.map(function(d, i){
+    var hol = holidayName(d, S.carrier), ok = S.shipDays.indexOf(dow(d)) >= 0 && !hol;
+    return '<button class="chip' + (ok ? '' : ' off') + '" type="button" data-ship="' + d + '" aria-pressed="' + (d === cur) + '">' + (i === 0 ? 'Today' : WD[dow(d)]) + '<small>' + MO[+d.slice(5, 7) - 1] + ' ' + (+d.slice(8, 10)) + (hol ? ' · closed' : '') + '</small></button>';
+  }).join('');
+  var r = route(cur, {origin:'o', dest:'d', hubs:S.hubs, carrier:S.carrier, service:S.service, buffer:false});
+  var wknd = false; for(var d = addDays(cur, 1); d < r.arrive; d = addDays(d, 1)) if(!isDeliveryDay(d, S.carrier)) wknd = true;
+  $('dayHint').textContent = 'Ships ' + dayName(cur) + ', arrives ' + dayName(r.arrive) + ' (' + r.nights + (r.nights === 1 ? ' night' : ' nights') + ' in transit)' + (wknd ? '. It sits over a weekend or holiday: USARK says don\'t ship on Fridays or weekends.' : '.');
+  $('wdays').innerHTML = [1,2,3,4,5,6,0].map(function(w){ var on = S.shipDays.indexOf(w) >= 0; return '<button class="chip" type="button" data-wd="' + w + '" aria-pressed="' + on + '">' + WD[w] + '</button>'; }).join('');
+  $('originName').textContent = S.origin ? (cleanZip(S.origin) ? (placeName(cleanZip(S.origin)) || '') : 'Type a 5-digit US ZIP') : '';
+}
+function renderScale(){
+  var t = S.th, lo = 0, hi = 110, segs = [];
+  function pct(v){ return Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100)); }
+  var cuts = [];   // [from, to, cls, text]
+  var a = lo;
+  if(t.holdLo != null){ cuts.push([a, t.holdLo + 1, 'b-hold', 'HOLD']); a = t.holdLo + 1; }
+  if(t.insLo != null && t.insLo + 1 > a){ cuts.push([a, t.insLo + 1, 'b-ins', 'PACK+BOX']); a = t.insLo + 1; }
+  if(t.packLo != null && t.packLo + 1 > a){ cuts.push([a, t.packLo + 1, 'b-pack', 'HEAT PACK']); a = t.packLo + 1; }
+  var top = hi, hcuts = [];
+  if(t.holdHi != null){ hcuts.unshift([t.holdHi, top, 'b-hold', 'HOLD']); top = t.holdHi; }
+  if(t.stationHi != null && t.stationHi < top){ hcuts.unshift([t.stationHi, top, 'b-station', 'PICKUP']); top = t.stationHi; }
+  if(t.coldHi != null && t.coldHi < top){ hcuts.unshift([t.coldHi, top, 'b-cold', 'COLD PACK']); top = t.coldHi; }
+  if(top > a) cuts.push([a, top, 'b-ok', 'SHIP']);
+  cuts = cuts.concat(hcuts);
+  var bar = cuts.map(function(c){ var w = pct(c[1]) - pct(c[0]); if(w <= 0) return ''; return '<span class="' + c[2] + '" style="width:' + w + '%" title="' + c[3] + ' ' + c[0] + '–' + (c[1] - 1) + '°F">' + (w > 14 ? c[3] : '') + '</span>'; }).join('');
+  var ticks = [10, 32, 50, 70, 90].map(function(v){ return '<i style="left:' + pct(v) + '%">' + v + '°</i>'; }).join('');
+  var p = PRESETS[S.preset], edited = S.preset !== 'custom' && JSON.stringify(th0(S.preset)) !== JSON.stringify(S.th);
+  $('scale').innerHTML = '<div class="bar">' + bar + '</div><div class="ticks">' + ticks + '</div><div class="src">' + esc(edited ? 'Edited from: ' + p.src : p.src) + '</div>';
+}
+
+/* ---------- orders + results ---------- */
+var lastRun = null;
+function parsedNote(){
+  var p = parseOrders(S.orders);
+  var n = p.orders.length;
+  $('orderCount').textContent = n ? n + (n === 1 ? ' order' : ' orders') : '';
+  var h = '';
+  if(n || p.skipped.length){
+    h = n + (n === 1 ? ' order' : ' orders') + ' found' + (p.mode === 'csv' ? ' in the CSV' : '');
+    if(p.merged) h += '; merged ' + p.merged + ' repeated ' + (p.merged === 1 ? 'row' : 'rows') + ' of the same order';
+    if(p.skipped.length) h += '; skipped ' + p.skipped.length + ': ' + p.skipped.slice(0, 3).map(function(s){ return esc(s.raw) + ' (' + esc(s.why) + ')'; }).join('; ') + (p.skipped.length > 3 ? '…' : '');
+    if(!isPro() && n > FREE_MAX) h += '. The free check covers the first ' + FREE_MAX + '; <a href="#proSec">Pro</a> checks all of them.';
+  }
+  $('parsed').innerHTML = h;
+  return p;
+}
+function cfgFor(dest){ return {origin:cleanZip(S.origin), dest:dest, hubs:S.hubs.map(cleanZip).filter(Boolean).slice(0, isPro() ? 3 : 1), carrier:S.carrier, service:+S.service, buffer:!!S.buffer, dropDay:!!S.dropDay}; }
+function whereText(e, wx, buyer){
+  if(e.at === 'origin') return buyer ? 'here where we ship from' : 'where you ship from';
+  if(buyer && e.at === 'door') return 'at your address';
+  if(buyer && e.at === 'hub') return 'at the carrier\'s ' + (hubName(e.key) || placeName(e.key) || e.key) + ' hub';
+  if(e.at === 'hub') return 'at the ' + (hubName(e.key) || placeName(e.key) || e.key) + ' hub';
+  var pl = placeName(e.key);
+  if(e.at === 'transit') return 'on the way' + (pl ? ' (near ' + pl + ')' : '');
+  return pl ? 'in ' + pl : 'at the delivery address';
+}
+function whenText(e){ return (e.part === 'N' ? dayName(e.date) + ' night' : dayName(e.date)); }
+
+function runCheck(isExample){
+  var p = parsedNote();
+  var o = cleanZip(S.origin);
+  $('status').className = 'status';
+  if(!o){ $('status').className = 'status err'; $('status').textContent = 'Type the 5-digit ZIP you ship from first.'; $('origin').focus(); return; }
+  if(!p.orders.length){ $('status').className = 'status err'; $('status').textContent = 'No orders with a US ZIP found. Paste one order per line (name and ZIP) or an order CSV.'; $('orders').focus(); return; }
+  var orders = p.orders, over = 0;
+  if(!isPro() && orders.length > FREE_MAX){ over = orders.length - FREE_MAX; orders = orders.slice(0, FREE_MAX); if(!isExample) trackOnce('limit-hit'); }
+  if(!isExample){ trackOnce('check-run'); if(p.orders.length >= 2) trackOnce('paste-orders'); }
+  var btn = $('btnCheck'); btn.disabled = true; $('btnExample').disabled = true;
+  $('status').textContent = 'Getting forecasts…';
+  var ship = curShip(), runKeys = [];
+  (isExample ? Promise.resolve() : loadZips()).then(function(){
+    if(isExample) return;
+    var keys = {}; keys[o] = 1; cfgFor('').hubs.forEach(function(h){ keys[h] = 1; }); orders.forEach(function(x){ keys[x.zip] = 1; });
+    var list = runKeys = Object.keys(keys), done = 0;
+    return pool(list, 4, function(z){ return fetchWx(z).then(function(w){ done++; $('status').textContent = 'Getting forecasts… ' + done + ' of ' + list.length + ' places'; return w; }); });
+  }).then(function(){
+    CUR = isExample ? sampleWX(ship) : WX;
+    var wx = CUR, rows = orders.map(function(x){
+      var c = cfgFor(x.zip), r = route(ship, c), j = judge(r, wx, S.th), nx = null;
+      if(!SHIPPABLE[j.kind]) nx = nextSafe(ship, c, wx, S.th, S.shipDays);
+      return {o:x, r:r, j:j, next:nx};
+    });
+    lastRun = {ship:ship, rows:rows, over:over, total:p.orders.length, skipped:p.skipped, at:new Date(), example:!!isExample};
+    renderResults();
+    var tm = lastRun.at.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+    var failed = isExample ? [] : runKeys.filter(function(k){ return WX[k] && WX[k].err; });
+    if(!isExample && WX[o] && WX[o].err){ $('status').className = 'status err'; $('status').textContent = 'No forecast for your own ZIP ' + o + ': ' + ERRTXT[WX[o].err] + '.'; }
+    else if(failed.length){ $('status').className = 'status err'; $('status').textContent = failed.length + ' of ' + runKeys.length + ' places had no forecast (' + failed.slice(0, 3).map(function(k){ return k + ': ' + ERRTXT[WX[k].err]; }).join('; ') + (failed.length > 3 ? '; +' + (failed.length - 3) + ' more' : '') + '). Fetched ' + tm + '.'; }
+    else { $('status').className = 'status'; $('status').textContent = (isExample ? 'Sample weather, not a real forecast. ' : 'Forecast fetched ') + tm + '. Check again the morning you pack.'; }
+    if(!isExample){
+      if(rows.some(function(x){ return x.j.kind !== 'unknown'; })) trackOnce('verdicts-ready');
+      if(rows.some(function(x){ return x.j.kind === 'hold'; })) trackOnce('hold-found');
+      if(rows.some(function(x){ return x.j.kind !== 'ok' && x.j.kind !== 'hold' && x.j.kind !== 'unknown'; })) trackOnce('pack-found');
+      if(rows.some(function(x){ return x.next && x.next.j; })) trackOnce('next-day-found');
+      if(failed.some(function(k){ return WX[k].err !== 'zip'; })) trackOnce('fetch-fail');
+      var sb = document.querySelector('.when'); if(sb && sb.scrollIntoView) sb.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  }).catch(function(e){
+    $('status').className = 'status err'; $('status').textContent = 'Something went wrong loading the ZIP table or forecasts. Check your connection and press Check again.';
+    gcCount('fetch-fail');
+  }).then(function(){ btn.disabled = false; $('btnExample').disabled = false; renderSettings(); });
+}
+
+var VLABEL = {ok:'Ship', box:'Insulated box', coldpack:'Cold pack', pack:'Heat pack', insulate:'Heat pack + box', station:'Carrier pickup', mixed:'Your call', unknown:'No forecast', hold:'Hold'};
+function errOf(row){ var k = null; row.j.seen.forEach(function(x){ if(x.r.miss && x.r.miss !== 'beyond' && !k) k = x.e.key; }); return k; }
+function why(row){
+  var j = row.j, wx = CUR, late = j.lateSkipped && j.kind !== 'hold' ? ' (the day-late check isn\'t in the forecast yet)' : '';
+  if(j.kind === 'unknown'){
+    if(j.missing === 'beyond') return 'The forecast doesn\'t reach ' + dayName(row.r.arrive) + ' yet';
+    var k = errOf(row), w = k && wx[k]; return 'No forecast for ' + k + ': ' + ((w && ERRTXT[w.err]) || 'unknown ZIP');
+  }
+  if(j.kind === 'ok') return 'Low ' + j.lo.t + '°' + (j.hi ? ', high ' + j.hi.t + '°' : '') + ' on the way' + late;
+  if(j.kind === 'box') return 'Cool nights (' + j.lo.t + '°) and warm days (' + j.hi.t + '°): an insulated box, no heat or cold pack' + late;
+  if(j.kind === 'mixed') return 'Low ' + j.lo.t + '° ' + whereText(j.lo.e, wx) + ' and high ' + j.hi.t + '° ' + whereText(j.hi.e, wx) + ': needs both warmth and cooling, your call';
+  var b = j.because; if(!b) return '';
+  if(j.packShort) return j.nights + ' nights in transit with ' + b.t + '° ' + whereText(b.e, wx) + ': longer than a 96-hour heat pack lasts';
+  return b.t + '° ' + whereText(b.e, wx) + ', ' + whenText(b.e) + (b.e.late ? ' (if it arrives a day late)' : '') + late;
+}
+function stopHTML(label, items, worst){
+  var t = items.map(function(it){
+    var r = it.r, isW = worst && worst.e === it.e;
+    if(r.past) return '';
+    var lab = (it.e.part === 'N' ? WD[dow(it.e.date)] + ' night ' : WD[dow(it.e.date)] + ' high ') + (it.e.late ? '(late) ' : '');
+    if(r.miss) return '<div><span class="na">' + esc(lab) + '—</span></div>';
+    return '<div>' + esc(lab) + '<b' + (isW ? ' class="worst"' : '') + '>' + r.t + '°</b></div>';
+  }).join('');
+  return '<div class="stop"><div class="wh" title="' + esc(label) + '">' + esc(label) + '</div><div class="t">' + (t || '<span class="na">nothing to check</span>') + '</div></div>';
+}
+function labelHTML(row, idx){
+  var j = row.j, o = row.o, wx = CUR;
+  var groups = [], gmap = {};
+  j.seen.forEach(function(s){ var k = s.e.at + '|' + s.e.key; if(!gmap[k]){ gmap[k] = {e:s.e, items:[]}; groups.push(gmap[k]); } gmap[k].items.push(s); });
+  var order = {origin:0, transit:1, hub:2, door:3};
+  groups.sort(function(a, b){ return order[a.e.at] - order[b.e.at]; });
+  var worst = j.because || null;
+  var stops = groups.map(function(g){
+    var nm = g.e.at === 'origin' ? 'You · ' + g.e.key : g.e.at === 'hub' ? (hubName(g.e.key) || placeName(g.e.key) || g.e.key) + ' hub' : g.e.at === 'transit' ? 'En route · ' + (placeName(g.e.key) || g.e.key) : 'Door · ' + (placeName(g.e.key) || g.e.key);
+    g.items.sort(function(a, b){ return a.e.date < b.e.date ? -1 : a.e.date > b.e.date ? 1 : (a.e.part === 'D' ? -1 : 1); });
+    return stopHTML(nm, g.items, worst);
+  }).join('');
+  var k = j.kind, extra = '';
+  if(k === 'pack' || k === 'insulate') extra = '<div class="why">' + j.packHrs + '-hour pack (' + j.nights + (j.nights === 1 ? ' night' : ' nights') + ' in transit)' + (k === 'insulate' ? ', insulated box' : '') + '</div>';
+  var foot = '', nx = row.next;
+  if(nx && nx.j) foot += '<span class="next">Next day that works: ' + dayName(nx.date) + (nx.j.kind !== 'ok' ? ' (' + VLABEL[nx.j.kind].toLowerCase() + ')' : '') + '</span>';
+  else if(nx && nx.beyond) foot += '<span class="next">No safe ship day inside the forecast yet (it reaches about a week out). Check again tomorrow.</span>';
+  else if(nx && nx.err) foot += '<span class="next">Can\'t look for a better day: a stop on this route has no forecast.</span>';
+  else if(k === 'hold' || k === 'mixed') foot += '<span class="next">No safe ship day in the forecast window.</span>';
+  var dw = wx[o.zip];
+  if(dw && dw.water) foot += '<span>The weather service has no land forecast at ZIP ' + esc(o.zip) + '\'s point: checked nearby inland' + (dw.place ? ' (' + esc(dw.place) + ')' : '') + '.</span>';
+  else if(dw && dw.approx) foot += '<span>ZIP ' + esc(o.zip) + ' isn\'t in our ZIP list: checked the ' + esc(o.zip.slice(0, 3)) + 'xx area' + (dw.place ? ' near ' + esc(dw.place) : '') + '.</span>';
+  else if(dw && dw.mi >= 25) foot += '<span>The nearest weather-service town is ' + esc(dw.place) + ', ' + dw.mi + ' miles from the forecast point.</span>';
+  if(k !== 'ok' && k !== 'unknown' && k !== 'mixed' && k !== 'box') foot += '<button class="btn small" type="button" data-note="' + idx + '">Copy note to buyer</button>';
+  return '<article class="label v-' + k + '">'
+    + '<div class="who"><div class="nm">' + esc(o.name || 'Order ' + (idx + 1)) + '</div><div class="zp">' + esc((o.id ? o.id + ' · ' : '') + o.zip) + '</div></div>'
+    + '<div class="route">' + stops + '</div>'
+    + '<div class="verdict"><span class="stamp">' + esc(VLABEL[k]) + '</span><div class="why">' + esc(why(row)) + '</div>' + extra + '</div>'
+    + (foot ? '<div class="foot">' + foot + '</div>' : '')
+    + '</article>';
+}
+function renderResults(){
+  var el = $('results');
+  if(!lastRun){
+    el.innerHTML = '<div class="empty"><b>How it works</b><ol><li>Type the ZIP you ship from, your carrier and the hub your boxes go through.</li><li>Pick what you ship: the safe temperatures come from published shipping guidelines (you can change them).</li><li>Paste your orders and press Check. Each order gets the coldest night and hottest day on its route, and a call.</li></ol></div>';
+    return;
+  }
+  var R = lastRun, cnt = {hold:0, pack:0, ok:0, other:0};
+  R.rows.forEach(function(x){ var k = x.j.kind; if(k === 'hold') cnt.hold++; else if(k === 'pack' || k === 'insulate' || k === 'box' || k === 'coldpack') cnt.pack++; else if(k === 'ok') cnt.ok++; else cnt.other++; });
+  var rows = R.rows.slice().map(function(x, i){ x.i = i; return x; }).sort(function(a, b){ return RANK[b.j.kind] - RANK[a.j.kind] || a.i - b.i; });
+  var r0 = R.rows[0].r;
+  var h = '<div class="when"><b>' + (R.example ? 'Example with made-up weather. ' : '') + 'Shipping ' + dayName(R.ship) + '</b> by ' + {fedex:'FedEx', ups:'UPS', usps:'USPS'}[S.carrier] + ' ' + (S.service == 1 ? 'overnight' : S.service + '-day') + ', arriving ' + dayName(r0.arrive) + '. Pick another ship day under Your route to compare.' + (R.example ? ' <button class="btn small" type="button" id="btnBackMine">Back to my own orders</button>' : '') + '</div>';
+  var originHolds = R.rows.filter(function(x){ return x.j.kind === 'hold' && x.j.because && x.j.because.e.at === 'origin' && x.j.because.e.part === 'N'; });
+  if(originHolds.length && originHolds.length === cnt.hold && !S.dropDay) h += '<div class="more"><b>' + originHolds.length + (originHolds.length === 1 ? ' order is' : ' orders are') + ' held because of your own night (' + originHolds[0].j.because.t + '°F).</b> If your boxes are at the carrier by the afternoon, tick "My boxes are with the carrier by the afternoon" under Your route.</div>';
+  h += '<div class="sumbar"><div class="s-hold"><b>' + cnt.hold + '</b>hold</div><div class="s-pack"><b>' + cnt.pack + '</b>pack or box</div><div class="s-ok"><b>' + cnt.ok + '</b>ship as is</div><div class="s-other"><b>' + cnt.other + '</b>other</div></div>';
+  h += '<div class="acts" style="margin:0 0 12px"><button class="btn small" type="button" id="btnCopySum">Copy the list</button><button class="btn small" type="button" id="btnPrint">Print pack list</button><button class="btn small" type="button" id="btnAllNotes">Copy all buyer notes' + (isPro() ? '' : ' (Pro)') + '</button></div>';
+  h += rows.map(function(x){ return labelHTML(x, x.i); }).join('');
+  if(R.over) h += '<div class="more"><b>' + R.over + ' more ' + (R.over === 1 ? 'order' : 'orders') + ' not checked.</b> The free check covers ' + FREE_MAX + ' orders at a time. <a href="#proSec">Pro checks every order</a> in one go.</div>';
+  el.innerHTML = h;
+  renderPrint();
+}
+
+/* notes to buyers */
+function firstName(n){ n = cleanName(n).replace(/^(mr|mrs|ms|miss|dr|sgt|capt|rev|prof)\.?\s+/i, ''); if(!n) return 'there'; var f = n.split(/\s+/)[0]; return /^[A-Za-z][A-Za-z'.-]*$/.test(f) ? f.charAt(0).toUpperCase() + f.slice(1) : 'there'; }
+function goodsWord(){ var g = (PRESETS[S.preset] || {}).goods || 'order'; return g === 'order' ? 'order' : g; }
+function noteFor(row){
+  var j = row.j, b = j.because, o = row.o, g = goodsWord(), live = g === 'order' ? 'your order' : 'live ' + g;
+  var hi = 'Hi ' + firstName(o.name) + ',\n\n', ord = o.id ? 'Your order ' + o.id : 'Your order';
+  var place = b ? whereText(b.e, CUR, true) : '', when = b ? whenText(b.e) + (b.e.late ? ' (if the box were a day late)' : '') : '';
+  var nxt = row.next && row.next.j ? 'on ' + dayName(row.next.date) : 'as soon as the forecast is safe, and we\'ll email you first';
+  var t;
+  if(j.kind === 'hold' && j.packShort) t = ord + ' is ready, but this week it would spend ' + j.nights + ' nights in transit with ' + b.t + '°F ' + place + ', longer than a heat pack lasts. We\'re holding it and aim to ship ' + nxt + '. You don\'t need to do anything; you\'ll get tracking when it goes out.';
+  else if(j.kind === 'hold' && !j.heat) t = ord + ' is ready, but the forecast shows ' + b.t + '°F ' + place + ' on ' + when + '. That is too cold for ' + live + ' in the mail, even with a heat pack, so we\'re holding it and aim to ship ' + nxt + '. You don\'t need to do anything; you\'ll get tracking when it goes out.';
+  else if(j.kind === 'hold') t = ord + ' is ready, but it\'s forecast to reach ' + b.t + '°F ' + place + ' on ' + when + '. That is too hot for ' + live + ' in a delivery truck, so we\'re holding it and aim to ship ' + nxt + '. You don\'t need to do anything; you\'ll get tracking when it goes out.';
+  else if(j.kind === 'pack' || j.kind === 'insulate') t = 'Heads up: it\'s forecast to be ' + b.t + '°F ' + place + ' on ' + when + ', so ' + (o.id ? 'order ' + o.id : 'your order') + ' is going out with a heat pack' + (j.kind === 'insulate' ? ' in an insulated box' : '') + '. Please bring the box inside as soon as it arrives and open it at room temperature.';
+  else if(j.kind === 'coldpack') t = 'Heads up: it\'s forecast to reach ' + b.t + '°F ' + place + ' on ' + when + ', so ' + (o.id ? 'order ' + o.id : 'your order') + ' is going out with a cold pack. Please bring the box inside as soon as it arrives.';
+  else if(j.kind === 'station') t = 'It\'s forecast to reach ' + b.t + '°F ' + place + ' on ' + when + '. To keep the box out of a hot truck and off your porch, we\'d like to ship it to a ' + {fedex:'FedEx', ups:'UPS', usps:'post office'}[S.carrier] + ' location near you to pick up. Is that OK? If so, reply with the location that suits you.';
+  else return '';
+  return hi + t + '\n\n' + (j.kind === 'hold' ? 'Thanks for your patience,' : 'Thanks,') + '\n' + (S.shop || '');
+}
+function copyText(t){
+  if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(function(){ return true; }, function(){ return fallbackCopy(t); });
+  return Promise.resolve(fallbackCopy(t));
+}
+function fallbackCopy(t){ var a = document.createElement('textarea'); a.value = t; a.style.position = 'fixed'; a.style.top = '-100px'; document.body.appendChild(a); a.select(); var ok = false; try{ ok = document.execCommand('copy'); }catch(e){} a.remove(); return ok; }
+function toast(m){ var t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(function(){ t.style.display = 'none'; }, 2200); }
+function summaryText(){
+  if(!lastRun) return '';
+  var R = lastRun, lines = ['Ship or Hold: shipping ' + dayName(R.ship) + ', arriving ' + dayName(R.rows[0].r.arrive)];
+  R.rows.forEach(function(x){ lines.push((VLABEL[x.j.kind].toUpperCase() + '            ').slice(0, 16) + (x.o.id ? x.o.id + ' ' : '') + (x.o.name || '') + ' ' + x.o.zip + (x.j.packHrs ? ' (' + x.j.packHrs + 'h pack' + (x.j.kind === 'insulate' ? ', insulated box' : '') + ')' : '') + (x.next && x.next.j ? ' -> ' + dayName(x.next.date) : '') + ' | ' + why(x)); });
+  if(R.over) lines.push(R.over + ' more orders not checked (free check: ' + FREE_MAX + ').');
+  if(!isPro()) lines.push('', 'Made with Ship or Hold, free at ' + SITE + '?via=text');
+  return lines.join('\n');
+}
+function renderPrint(){
+  if(!lastRun){ $('printSheet').innerHTML = ''; return; }
+  var R = lastRun;
+  var h = '<h2>Pack list: shipping ' + esc(dayName(R.ship)) + ', arriving ' + esc(dayName(R.rows[0].r.arrive)) + '</h2><p>' + (R.example ? 'Example with made-up weather.' : 'Forecast fetched ' + esc(R.at.toLocaleString()) + '.') + ' Guideline: ' + esc(PRESETS[S.preset].label) + (JSON.stringify(S.th) !== JSON.stringify(th0(S.preset)) ? ' (edited)' : '') + '.</p>';
+  h += '<table><thead><tr><th>Call</th><th>Order</th><th>Name</th><th>ZIP</th><th>Pack</th><th>Why</th><th>Packed</th></tr></thead><tbody>';
+  R.rows.forEach(function(x){ h += '<tr><td class="mk">' + esc(VLABEL[x.j.kind]) + '</td><td>' + esc(x.o.id) + '</td><td>' + esc(x.o.name) + '</td><td>' + esc(x.o.zip) + '</td><td>' + (x.j.packHrs ? x.j.packHrs + '-hour heat pack' + (x.j.kind === 'insulate' ? ', insulated box' : '') : x.j.kind === 'coldpack' ? 'cold pack' : x.j.kind === 'box' ? 'insulated box, no pack' : '') + '</td><td>' + esc(why(x)) + (x.next && x.next.j ? '. Next: ' + esc(dayName(x.next.date)) : '') + '</td><td>&#9744;</td></tr>'; });
+  h += '</tbody></table>' + (isPro() ? '' : '<p>Made with Ship or Hold · samsbench.com/ship-or-hold</p>');
+  $('printSheet').innerHTML = h;
+}
+
+/* ---------- Pro section ---------- */
+function renderPro(){
+  var el = $('proSec');
+  if(isPro()){
+    el.innerHTML = '<h2>Pro is on</h2><p class="on">Every order checked, up to three hubs, all buyer notes in one copy, and the pack list prints without our footer. Thanks for buying.</p>'
+      + '<div class="prorow"><div><label class="f" for="shopName">Sign buyer notes as</label><input type="text" id="shopName" maxlength="60" value="' + esc(S.shop) + '" placeholder="Your shop name"></div></div>';
+    return;
+  }
+  var u = buyUrl();
+  el.innerHTML = '<h2>Ship or Hold Pro · ' + PRICE + ' once</h2>'
+    + '<p class="price">One payment, no subscription. Keeps working on this device.</p>'
+    + '<ul><li>Check every order in one go (free checks ' + FREE_MAX + ' at a time)</li><li>Up to three hubs on the route, for orders that change planes</li><li>Copy every buyer note at once</li><li>Pack list prints without the Ship or Hold footer</li></ul>'
+    + (u ? '<a class="btn buy" data-buy href="' + esc(u) + '" target="_blank" rel="noopener">Get Pro for ' + PRICE + '</a>' : '<p><b>Pro checkout opens soon.</b></p>')
+    + '<div class="prorow"><div><label class="f" for="licKey">Got a gift code, or already bought? Enter the code, or the email you paid with</label><input type="text" id="licKey" autocomplete="email" spellcheck="false" placeholder="you@shop.com or GIFT-CODE"></div><div style="flex:0"><button class="btn" type="button" id="btnLic">Unlock Pro</button></div></div><p class="actnote" id="licNote" aria-live="polite"></p>'
+    + '<div class="prorow"><div><label class="f" for="shopName">Sign buyer notes as</label><input type="text" id="shopName" maxlength="60" value="' + esc(S.shop) + '" placeholder="Your shop name"></div></div>';
+}
+
+/* ---------- example ---------- */
+/* made-up but plausible weather, so the example always shows every kind of call; [day high, night low, place] */
+var SAMPLE = {'33602':[78, 62, 'Tampa, FL'], '38118':[58, 52, 'Memphis, TN'], '55401':[30, 18, 'Minneapolis, MN'], '80202':[50, 37, 'Denver, CO'],
+  '02108':[55, 46, 'Boston, MA'], '85004':[74, 55, 'Phoenix, AZ'], '98101':[56, 52, 'Seattle, WA']};
+function sampleWX(ship){
+  var t = todayLocal(), out = {};
+  Object.keys(SAMPLE).forEach(function(z){
+    var a = SAMPLE[z], m = {};
+    for(var i = 0; i < 16; i++){ var d = addDays(t, i), lo = a[1], hi = a[0];
+      if(z === '55401' && d > addDays(ship, 1)){ lo = 36; hi = 44; }   // Minneapolis warms up after the first two nights
+      m[d + '|D'] = hi; m[d + '|N'] = lo; }
+    out[z] = {map:m, first:t, last:addDays(t, 15), place:a[2], at:Date.now()};
+  });
+  return out;
+}
+var EXAMPLE_ORDERS = '#2041 Dana Ruiz, 55401\n#2042 Marcus Lee, 80202\n#2043 Priya Natarajan, 02108\n#2044 Tom Becker, 85004\n#2045 Ana Souza, 98101';
+function example(){
+  if(!S.example) SAVED = JSON.parse(JSON.stringify(S));
+  S = blank(); S.example = true; S.origin = '33602'; S.carrier = 'fedex'; S.service = 1; S.hubs = ['38118']; S.preset = 'plants'; S.th = th0('plants'); S.orders = EXAMPLE_ORDERS; S.shop = 'Bayside Plant Co.';
+  var ch = shipChoices(); for(var i = 1; i < ch.length; i++) if(S.shipDays.indexOf(dow(ch[i])) >= 0 && !holidayName(ch[i], 'fedex') && isDeliveryDay(arrivalDate(ch[i], 1, 'fedex'), 'fedex') && dow(arrivalDate(ch[i], 1, 'fedex')) !== 5){ S.ship = ch[i]; break; }
+}
+
+/* ---------- events ---------- */
+function renderAll(){ renderSettings(); $('orders').value = S.orders; parsedNote(); renderResults(); renderPro(); }
+$('origin').addEventListener('focus', function(){ if(S.example){ leaveExample(); } });
+$('orders').addEventListener('focus', function(){ if(S.example){ leaveExample(); } });
+$('origin').addEventListener('input', function(){ userEdit(); S.origin = this.value.trim(); save(); var z = cleanZip(S.origin); $('originName').textContent = S.origin && !z ? 'Type a 5-digit US ZIP' : (placeName(z) || ''); });
+$('carrier').addEventListener('change', function(){ userEdit(); var was = S.carrier; S.carrier = this.value;
+  var pres = (HUB_PRESETS[was] || []).map(function(p){ return p[0]; });
+  if(S.hubs.length === 1 && pres.indexOf(S.hubs[0]) >= 0) S.hubs = HUB_PRESETS[S.carrier].length ? [HUB_PRESETS[S.carrier][0][0]] : [];
+  save(); renderSettings(); });
+$('service').addEventListener('change', function(){ userEdit(); S.service = +this.value; save(); renderSettings(); });
+$('buffer').addEventListener('change', function(){ userEdit(); S.buffer = this.checked; save(); });
+$('dropDay').addEventListener('change', function(){ userEdit(); S.dropDay = this.checked; save(); if(lastRun) runCheck(lastRun.example); });
+$('preset').addEventListener('change', function(){ userEdit(); S.preset = this.value; S.th = (S.edits && S.edits[S.preset]) ? JSON.parse(JSON.stringify(S.edits[S.preset])) : th0(S.preset); save(); renderSettings(); });
+$('orders').addEventListener('input', function(){ userEdit(); S.orders = this.value; save(); parsedNote(); });
+document.addEventListener('input', function(e){
+  var t = e.target;
+  if(t.matches('[data-th]')){ userEdit(); var v = t.value.trim(), n = parseFloat(v.replace(/[^\d.-]/g, '')), key = t.getAttribute('data-th');
+    if(v === ''){ S.th[key] = null; t.removeAttribute('aria-invalid'); }
+    else if(isFinite(n)){ S.th[key] = Math.round(n); t.removeAttribute('aria-invalid'); }
+    else t.setAttribute('aria-invalid', 'true');   // keep the last good number
+    if(S.preset !== 'custom'){ S.edits = S.edits || {}; S.edits[S.preset] = JSON.parse(JSON.stringify(S.th)); }
+    save(); renderScale(); }
+  else if(t.matches('[data-hub]')){ userEdit(); S.hubs[+t.getAttribute('data-hub')] = t.value.trim(); save(); }
+  else if(t.id === 'shopName'){ S.shop = t.value; save(); }
+});
+document.addEventListener('click', function(e){
+  var t = e.target.closest ? e.target.closest('button, a') : null; if(!t) return;
+  if(t.hasAttribute('data-ship')){ userEdit(); S.ship = t.getAttribute('data-ship'); save(); renderSettings(); if(lastRun) runCheck(lastRun.example); return; }
+  if(t.hasAttribute('data-wd')){ userEdit(); var w = +t.getAttribute('data-wd'), i = S.shipDays.indexOf(w); if(i >= 0){ if(S.shipDays.length > 1) S.shipDays.splice(i, 1); } else S.shipDays.push(w); save(); renderSettings(); return; }
+  if(t.hasAttribute('data-delhub')){ userEdit(); S.hubs.splice(+t.getAttribute('data-delhub'), 1); save(); renderSettings(); return; }
+  if(t.hasAttribute('data-addhub')){
+    userEdit(); var z = t.getAttribute('data-addhub'), max = isPro() ? 3 : 1;
+    if(z && S.hubs.indexOf(z) >= 0){ S.hubs.splice(S.hubs.indexOf(z), 1); save(); renderSettings(); return; }
+    if(S.hubs.length >= max){
+      if(max === 1 && z){ S.hubs = [z]; save(); renderSettings(); return; }
+      if(!S.example) trackOnce('hub-limit'); toast(isPro() ? 'Three hubs at most' : 'Free checks one hub. Pro adds up to three.'); return;
+    }
+    S.hubs.push(z); save(); renderSettings();
+    if(!z){ var ins = document.querySelectorAll('[data-hub]'); if(ins.length) ins[ins.length - 1].focus(); }
+    return;
+  }
+  if(t.id === 'btnCheck'){ runCheck(S.example); return; }
+  if(t.id === 'btnExample'){ example(); trackOnce('example'); lastRun = null; renderAll(); runCheck(true); return; }
+  if(t.id === 'btnBackMine'){ leaveExample(); return; }
+  if(t.id === 'btnClear'){ if(S.example){ leaveExample(); return; } var keep = {origin:S.example ? '' : S.origin, carrier:S.carrier, service:S.service, hubs:S.hubs, preset:S.preset, th:S.th, buffer:S.buffer, shipDays:S.shipDays, shop:S.example ? '' : S.shop}; S = Object.assign(blank(), keep); lastRun = null; save(); renderAll(); return; }
+  if(t.hasAttribute('data-note')){
+    var row = lastRun && lastRun.rows[+t.getAttribute('data-note')]; if(!row) return;
+    copyText(noteFor(row)).then(function(ok){ toast(ok === false ? 'Copy failed: select and copy by hand' : 'Note copied'); });
+    if(!lastRun.example) trackOnce('copy-note'); return;
+  }
+  if(t.id === 'btnCopySum'){ copyText(summaryText()).then(function(ok){ toast(ok === false ? 'Copy failed' : 'List copied'); }); if(!lastRun.example) trackOnce('export-copy'); return; }
+  if(t.id === 'btnPrint'){ renderPrint(); if(!lastRun.example) trackOnce('export-print'); window.print(); return; }
+  if(t.id === 'btnAllNotes'){
+    if(!isPro()){ if(!S.example) trackOnce('limit-hit'); $('proSec').scrollIntoView({behavior:'smooth'}); toast('Copying every note at once is in Pro'); return; }
+    var all = lastRun.rows.map(noteFor).filter(Boolean).join('\n\n----------\n\n');
+    copyText(all || 'No notes needed: every order ships as is.').then(function(){ toast('All notes copied'); });
+    if(!lastRun.example) trackOnce('copy-note'); return;
+  }
+  if(t.id === 'btnLic'){
+    var k = ($('licKey').value || '').trim(), note = $('licNote'); if(!k) return;
+    t.disabled = true; note.textContent = 'Checking…';
+    if(k.indexOf('@') < 0){
+      checkGift(k).then(function(ok){ t.disabled = false;
+        if(ok){ PRO.key = 'gift:' + k.toUpperCase().replace(/\s+/g, ''); PRO.kind = 'lifetime'; lsSet(PROKEY, PRO); track('pro-unlocked-gift'); renderAll(); toast('Pro unlocked'); }
+        else { track('unlock-fail'); gcCount('unlock-fail-gift'); note.textContent = 'That gift code was not recognised. Check the spelling, or enter the email you paid with.'; } });
+      return;
+    }
+    verifyLicense(k.toLowerCase()).then(function(j){ t.disabled = false;
+      if(j.valid){ PRO.key = k.toLowerCase(); PRO.kind = j.kind || 'lifetime'; lsSet(PROKEY, PRO); track('pro-unlocked'); renderAll(); toast('Pro unlocked'); }
+      else { track('unlock-fail'); gcCount('unlock-fail-email'); note.textContent = 'No Pro purchase found for that email. Use the email on your Whop receipt; if it still fails, reply to the receipt and we will sort it out.'; }
+    }, function(){ t.disabled = false; track('unlock-fail'); gcCount('unlock-fail-net'); note.textContent = 'Could not check right now. Check your connection and try again in a minute.'; });
+    return;
+  }
+  if(t.matches('a[data-buy]')){ trackOnce('buy-click'); return; }
+});
+document.addEventListener('auxclick', function(e){ var a = e.button === 1 && e.target.closest && e.target.closest('a[data-buy]'); if(a) trackOnce('buy-click'); });
+if('IntersectionObserver' in window){
+  var BOUGHT = /[?&]bought=1/.test(location.search);
+  var io = new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting && !isPro() && !BOUGHT) trackOnce('pro-view'); }); }, {threshold:0.5});
+  setTimeout(function(){ io.observe($('proSec')); }, 1500);
+}
+
+/* ---------- boot ---------- */
+loadPro(); affCode();
+var had = load();
+var lastSeen = +lsGet('sh.seen', 0); lsSet('sh.seen', Date.now());
+if(had && !S.example && cleanZip(S.origin)){ started = true; ONCE['tool-start'] = 1; if(lastSeen && Date.now() - lastSeen > 6 * 3600e3) trackOnce('return-visit'); }
+renderAll();
+if(GC_CODE){ var gs = document.createElement('script'); gs.async = true; gs.src = '//gc.zgo.at/count.js'; gs.setAttribute('data-goatcounter', 'https://' + GC_CODE + '.goatcounter.com/count'); if(SRC === 'selftest') gs.setAttribute('data-goatcounter-settings', '{"no_onload": true}'); document.head.appendChild(gs); }
+(function(){
+  var q = new URLSearchParams(location.search);
+  var via = cleanVia(q.get('via')), af = (q.get('a') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
+  if(via) gcCount('via-' + via);
+  /* ?via=selftest: send every funnel event once as "<event>.selftest" only (through the same 700 ms queue), so delivery
+     can be checked from a real browser on the laptop without touching the real counts. */
+  if(via === 'selftest') Object.keys(FUNNEL_EV).forEach(function(n){ gcCount(n + '.selftest'); });
+  if(af) track('aff-' + af);
+  if(q.get('bought') === '1') trackOnce('bought-return');
+  if(q.get('bought') === '1' && !isPro()){
+    setTimeout(function(){ var ln = $('licNote'), lk = $('licKey'); if(ln) ln.textContent = 'Thanks! Enter the email you just used on Whop and press Unlock Pro.'; $('proSec').scrollIntoView(); if(lk) lk.focus(); }, 400);
+  }
+})();
+window.__sh = {route:route, judge:judge, nextSafe:nextSafe, parseOrders:parseOrders, forecastToMap:forecastToMap, arrivalDate:arrivalDate, PRESETS:PRESETS, th0:th0, noteFor:noteFor, cleanZip:cleanZip, addDays:addDays,
+  setWX:function(w){ Object.keys(w).forEach(function(k){ WX[k] = w[k]; }); }, sampleWX:sampleWX, gcq:function(){ return GCQ.length + (GCBUSY ? 1 : 0); }, state:function(){ return S; }, last:function(){ return lastRun; }};
+})();
+</script>
+</body>
+</html>
