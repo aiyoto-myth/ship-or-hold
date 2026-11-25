@@ -799,7 +799,7 @@ function runCheck(isExample){
     });
     lastRun = {ship:ship, rows:rows, over:over, total:p.orders.length, skipped:p.skipped, at:new Date(), example:!!isExample};
     renderResults();
-    var tm = lastRun.at.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+    var tm = lastRun.at.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
     var failed = isExample ? [] : runKeys.filter(function(k){ return WX[k] && WX[k].err; });
     if(!isExample && WX[o] && WX[o].err){ $('status').className = 'status err'; $('status').textContent = 'No forecast for your own ZIP ' + o + ': ' + ERRTXT[WX[o].err] + '.'; }
     else if(failed.length){ $('status').className = 'status err'; $('status').textContent = failed.length + ' of ' + runKeys.length + ' places had no forecast (' + failed.slice(0, 3).map(function(k){ return k + ': ' + ERRTXT[WX[k].err]; }).join('; ') + (failed.length > 3 ? '; +' + (failed.length - 3) + ' more' : '') + '). Fetched ' + tm + '.'; }
@@ -930,7 +930,7 @@ function summaryText(){
 function renderPrint(){
   if(!lastRun){ $('printSheet').innerHTML = ''; return; }
   var R = lastRun;
-  var h = '<h2>Pack list: shipping ' + esc(dayName(R.ship)) + ', arriving ' + esc(dayName(R.rows[0].r.arrive)) + '</h2><p>' + (R.example ? 'Example with made-up weather.' : 'Forecast fetched ' + esc(R.at.toLocaleString()) + '.') + ' Guideline: ' + esc(PRESETS[S.preset].label) + (JSON.stringify(S.th) !== JSON.stringify(th0(S.preset)) ? ' (edited)' : '') + '.</p>';
+  var h = '<h2>Pack list: shipping ' + esc(dayName(R.ship)) + ', arriving ' + esc(dayName(R.rows[0].r.arrive)) + '</h2><p>' + (R.example ? 'Example with made-up weather.' : 'Forecast fetched ' + esc(R.at.toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})) + '.') + ' Guideline: ' + esc(PRESETS[S.preset].label) + (JSON.stringify(S.th) !== JSON.stringify(th0(S.preset)) ? ' (edited)' : '') + '.</p>';
   h += '<table><thead><tr><th>Call</th><th>Order</th><th>Name</th><th>ZIP</th><th>Pack</th><th>Why</th><th>Packed</th></tr></thead><tbody>';
   R.rows.forEach(function(x){ h += '<tr><td class="mk">' + esc(VLABEL[x.j.kind]) + '</td><td>' + esc(x.o.id) + '</td><td>' + esc(x.o.name) + '</td><td>' + esc(x.o.zip) + '</td><td>' + (x.j.packHrs ? x.j.packHrs + '-hour heat pack' + (x.j.kind === 'insulate' ? ', insulated box' : '') : x.j.kind === 'coldpack' ? 'cold pack' : x.j.kind === 'box' ? 'insulated box, no pack' : '') + '</td><td>' + esc(why(x)) + (x.next && x.next.j ? '. Next: ' + esc(dayName(x.next.date)) : '') + '</td><td>&#9744;</td></tr>'; });
   h += '</tbody></table>' + (isPro() ? '' : '<p>Made with Ship or Hold · samsbench.com/ship-or-hold</p>');
