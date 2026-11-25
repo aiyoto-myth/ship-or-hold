@@ -137,6 +137,8 @@ textarea{min-height:150px;font-family:var(--mono);font-size:14px;line-height:1.5
 .more{background:var(--paper);border:2px solid var(--line);padding:12px 14px;margin-bottom:12px;font-size:15px}
 
 /* pro */
+.share{margin:18px 0 0;padding:12px 14px;border:2px dashed var(--line);background:var(--paper)}
+.share p{margin:0 0 8px}
 .pro{margin-top:18px;background:var(--ink);color:var(--paper);border:2px solid var(--line);padding:18px}
 .pro h2{margin:0 0 6px;font-stretch:120%;font-weight:900;font-size:24px;text-transform:uppercase}
 .pro ul{margin:8px 0 12px;padding-left:20px}
@@ -248,12 +250,17 @@ footer p{margin:6px 0}
 
   <section id="results" style="margin-top:18px"></section>
 
+  <section class="share" id="shareSec">
+    <p>Know another seller who mails live plants or animals? Send them the page.</p>
+    <button class="btn small ghost" id="btnShare" type="button">Copy a link to send them</button> <span class="hint" id="shareMsg" aria-live="polite"></span>
+  </section>
+
   <section class="pro" id="proSec" aria-label="Ship or Hold Pro"></section>
 
   <footer>
     <p>Forecasts come from the US National Weather Service (api.weather.gov), fetched when you press Check. Forecasts change: check again the morning you pack. US addresses only. ZIP locations: <a href="https://www.geonames.org/">GeoNames</a> (CC BY 4.0) and US Census ZIP-area centers.</p>
     <p>The temperature bands are the published guidelines named under the scale (USARK, Reptiles Express, Palmstreet, Predatory Plants). Set your own if you know your stock better. This page makes the call from the numbers; the decision to ship is yours. Your orders and settings stay on this device; only ZIP-area coordinates go to the weather service, and only the email you type to unlock Pro is sent, to check the purchase.</p>
-    <p>Made by Sam at <a href="https://samsbench.com/?via=sh-footer">Sam's Bench</a>.</p>
+    <p>Made by Sam at <a href="https://samsbench.com/?via=sh-footer">samsbench.com</a>, small tools for small shops.</p>
   </footer>
 
   <div id="printSheet"></div>
@@ -660,13 +667,28 @@ function verifyLicense(email){
    Funnel events are sent plain and again as "<event>.<via>", so each channel can be followed down to buy-click. */
 var GC_CODE = 'shiporhold';
 function cleanVia(v){ return String(v || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20); }
-var SRC = (function(){ try{
-  var q = new URLSearchParams(location.search), v = cleanVia(q.get('via')) || (q.get('a') ? 'aff' : '');
-  if(v){ if(v !== 'selftest') localStorage.setItem('sh.src', JSON.stringify({v:v, t:Date.now()})); return v; }
-  var o = JSON.parse(localStorage.getItem('sh.src') || 'null');   // last source on this device, kept 30 days
-  return o && Date.now() - o.t < 30 * 864e5 ? o.v : '';
-}catch(e){ return ''; } })();
-var FUNNEL_EV = {'example':1, 'tool-start':1, 'paste-orders':1, 'check-run':1, 'verdicts-ready':1, 'hold-found':1, 'next-day-found':1, 'pack-found':1, 'copy-note':1, 'export-copy':1, 'export-print':1, 'limit-hit':1, 'hub-limit':1, 'return-visit':1, 'pro-view':1, 'buy-click':1, 'bought-return':1, 'pro-unlocked':1, 'pro-unlocked-gift':1, 'unlock-fail':1};
+/* Letters (FACTORY 7, 11-25): each recipient has their own code shNNN, and the link they pass on is shNNN-s. The landing event
+   keeps the personal code (via-sh012 / via-sh012-s); funnel events use the group (.shmail / .shshare) so each test stays one row.
+   A browser that came in on sh012 and then opens sh012-s is the recipient checking their own share link: no via-sh012-s. */
+var VIA_EV = '';
+function viaGroup(v){ var m = /^sh(\d{3})(-s)?$/.exec(v); return m ? (m[2] ? 'shshare' : 'shmail') : v; }
+function seenVias(){ try{ var a = JSON.parse(localStorage.getItem('sh.vias') || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+var SRC = (function(){
+  var v = '';
+  try{ var q = new URLSearchParams(location.search); v = cleanVia(q.get('via')) || (q.get('a') ? 'aff' : ''); }catch(e){}
+  VIA_EV = v === 'aff' ? '' : v;
+  try{
+    var m = /^sh(\d{3})(-s)?$/.exec(v), seen = seenVias();
+    if(m && !m[2] && seen.indexOf(v) < 0){ seen.push(v); localStorage.setItem('sh.vias', JSON.stringify(seen.slice(-20))); }
+    if(m && m[2] && seen.indexOf('sh' + m[1]) >= 0){ VIA_EV = ''; v = 'sh' + m[1]; }   // own share link: still their own visit
+    if(v){ if(v !== 'selftest') localStorage.setItem('sh.src', JSON.stringify({v:v, t:Date.now()})); return viaGroup(v); }
+    var o = JSON.parse(localStorage.getItem('sh.src') || 'null');   // last source on this device, kept 30 days
+    return o && Date.now() - o.t < 30 * 864e5 ? viaGroup(o.v) : '';
+  }catch(e){ return viaGroup(v); }
+})();
+/* the link a recipient passes on carries their own code + "-s", so the ledger can see who spread it */
+function shareLink(){ var s = seenVias(), own = s.length ? String(s[s.length - 1]) : ''; return SITE + '?via=' + (/^sh\d{3}$/.test(own) ? own + '-s' : 'share'); }
+var FUNNEL_EV = {'example':1, 'tool-start':1, 'paste-orders':1, 'check-run':1, 'verdicts-ready':1, 'hold-found':1, 'next-day-found':1, 'pack-found':1, 'copy-note':1, 'export-copy':1, 'export-print':1, 'limit-hit':1, 'hub-limit':1, 'return-visit':1, 'pro-view':1, 'buy-click':1, 'bought-return':1, 'pro-unlocked':1, 'pro-unlocked-gift':1, 'unlock-fail':1, 'share-copy':1};
 var GCQ = [], GCBUSY = false, ONCE = {};
 function gcDrain(){ if(!GCQ.length){ GCBUSY = false; return; } GCBUSY = true;
   if(!(window.goatcounter && window.goatcounter.count)){ setTimeout(gcDrain, 500); return; }
@@ -1017,6 +1039,11 @@ document.addEventListener('click', function(e){
     if(!z){ var ins = document.querySelectorAll('[data-hub]'); if(ins.length) ins[ins.length - 1].focus(); }
     return;
   }
+  if(t.id === 'btnShare'){
+    copyText(shareLink()).then(function(ok){ $('shareMsg').textContent = ok === false ? 'Copy failed. The link: ' + shareLink() : 'Link copied. Paste it into an email or message.'; });
+    if(!lsGet('sh.shared', 0)){ lsSet('sh.shared', Date.now()); track('share-copy'); }   // once per browser, counted even on the example
+    return;
+  }
   if(t.id === 'btnCheck'){ runCheck(S.example); return; }
   if(t.id === 'btnExample'){ example(); trackOnce('example'); lastRun = null; renderAll(); runCheck(true); return; }
   if(t.id === 'btnBackMine'){ leaveExample(); return; }
@@ -1068,7 +1095,7 @@ if(GC_CODE){ var gs = document.createElement('script'); gs.async = true; gs.src 
 (function(){
   var q = new URLSearchParams(location.search);
   var via = cleanVia(q.get('via')), af = (q.get('a') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
-  if(via) gcCount('via-' + via);
+  if(VIA_EV) gcCount('via-' + VIA_EV);
   /* ?via=selftest: send every funnel event once as "<event>.selftest" only (through the same 700 ms queue), so delivery
      can be checked from a real browser on the laptop without touching the real counts. */
   if(via === 'selftest') Object.keys(FUNNEL_EV).forEach(function(n){ gcCount(n + '.selftest'); });
